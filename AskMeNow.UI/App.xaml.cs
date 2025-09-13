@@ -33,12 +33,69 @@ public partial class App : System.Windows.Application
 
         await _host.StartAsync();
 
+        // Show main window first with welcome message
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         var viewModel = _host.Services.GetRequiredService<MainViewModel>();
         mainWindow.DataContext = viewModel;
         mainWindow.Show();
 
+        // After window is shown, open folder selection dialog
+        EventHandler? contentRenderedHandler = null;
+        contentRenderedHandler = async (sender, e) =>
+        {
+            // Unsubscribe to prevent multiple calls
+            mainWindow.ContentRendered -= contentRenderedHandler;
+            
+            // Small delay to ensure UI is fully loaded and welcome message is visible
+            await Task.Delay(500);
+            
+            var folderSelected = await ShowFolderSelectionDialogAsync(viewModel);
+            
+            if (!folderSelected)
+            {
+                // User cancelled folder selection, show message and allow retry
+                var result = MessageBox.Show(
+                    "Document selection is necessary before you can ask questions.\n\nWould you like to select a folder now?",
+                    "Documents Required",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    // Try folder selection again
+                    folderSelected = await ShowFolderSelectionDialogAsync(viewModel);
+                    if (!folderSelected)
+                    {
+                        Shutdown();
+                    }
+                }
+                else
+                {
+                    Shutdown();
+                }
+            }
+        };
+        
+        mainWindow.ContentRendered += contentRenderedHandler;
+
         base.OnStartup(e);
+    }
+
+    private async Task<bool> ShowFolderSelectionDialogAsync(MainViewModel viewModel)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Select folder containing documents"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            // Load documents and wait for completion
+            await viewModel.LoadDocumentsAsync(dialog.FolderName);
+            return true;
+        }
+
+        return false;
     }
 
     protected override async void OnExit(ExitEventArgs e)

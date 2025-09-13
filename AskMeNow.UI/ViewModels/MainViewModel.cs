@@ -13,9 +13,11 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly IQuestionHandler _questionHandler;
     private string _userQuestion = string.Empty;
     private bool _isLoading = false;
-    private string _statusMessage = "Please select a folder containing .txt files to begin.";
+    private string _statusMessage = "Welcome to AskMeNow! Please select a folder containing documents to begin.";
     private bool _isDocumentsLoaded = false;
+    private bool _isFolderSelectionInProgress = false;
     private ObservableCollection<Message> _messages = new();
+    private ObservableCollection<DocumentInfo> _loadedDocuments = new();
 
     public MainViewModel(IQuestionHandler questionHandler)
     {
@@ -26,14 +28,7 @@ public class MainViewModel : INotifyPropertyChanged
         EnterKeyCommand = new RelayCommand(async () => await HandleEnterKeyAsync());
         
         // Add welcome message
-        AddMessage("Welcome to AskMeNow! Loading documents...", MessageSender.AI);
-        
-        // Automatically prompt for folder selection on startup
-        _ = Task.Run(async () => 
-        {
-            await Task.Delay(500); // Small delay to let UI initialize
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(SelectFolder);
-        });
+        AddMessage("Welcome to AskMeNow! Loading your documents...", MessageSender.AI);
     }
 
     public string UserQuestion
@@ -87,6 +82,16 @@ public class MainViewModel : INotifyPropertyChanged
             _messages = value;
             OnPropertyChanged();
             ((RelayCommand)ExportCommand).RaiseCanExecuteChanged();
+        }
+    }
+
+    public ObservableCollection<DocumentInfo> LoadedDocuments
+    {
+        get => _loadedDocuments;
+        set
+        {
+            _loadedDocuments = value;
+            OnPropertyChanged();
         }
     }
 
@@ -173,20 +178,33 @@ public class MainViewModel : INotifyPropertyChanged
         ((RelayCommand)ExportCommand).RaiseCanExecuteChanged();
     }
 
-    private void SelectFolder()
+    private async void SelectFolder()
     {
-        var dialog = new Microsoft.Win32.OpenFolderDialog
-        {
-            Title = "Select folder containing .txt files"
-        };
+        // Prevent multiple folder selection dialogs
+        if (_isFolderSelectionInProgress)
+            return;
 
-        if (dialog.ShowDialog() == true)
+        _isFolderSelectionInProgress = true;
+
+        try
         {
-            LoadDocumentsAsync(dialog.FolderName);
+            var dialog = new Microsoft.Win32.OpenFolderDialog
+            {
+                Title = "Select folder containing documents"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                await LoadDocumentsAsync(dialog.FolderName);
+            }
+        }
+        finally
+        {
+            _isFolderSelectionInProgress = false;
         }
     }
 
-    private async void LoadDocumentsAsync(string folderPath)
+    public async Task LoadDocumentsAsync(string folderPath)
     {
         IsLoading = true;
         StatusMessage = "Loading documents...";
@@ -206,6 +224,24 @@ public class MainViewModel : INotifyPropertyChanged
             
             // Remove loading message
             Messages.Remove(loadingMessage);
+            
+            // Populate the loaded documents collection for the sidebar
+            LoadedDocuments.Clear();
+            foreach (var doc in documents)
+            {
+                var fileInfo = new FileInfo(doc.FilePath);
+                var documentInfo = new DocumentInfo
+                {
+                    Title = doc.Title,
+                    FilePath = doc.FilePath,
+                    FileExtension = Path.GetExtension(doc.FilePath).ToLowerInvariant(),
+                    WordCount = CountWords(doc.Content),
+                    FileSizeBytes = fileInfo.Exists ? fileInfo.Length : 0,
+                    LastModified = fileInfo.Exists ? fileInfo.LastWriteTime : DateTime.Now,
+                    Content = doc.Content
+                };
+                LoadedDocuments.Add(documentInfo);
+            }
             
             IsDocumentsLoaded = true;
             
@@ -316,6 +352,14 @@ public class MainViewModel : INotifyPropertyChanged
                 AddMessage($"❌ Error exporting conversation: {ex.Message}", MessageSender.AI);
             }
         }
+    }
+
+    private static int CountWords(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return 0;
+        
+        return text.Split(new char[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
