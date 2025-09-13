@@ -1,0 +1,11 @@
+# Visual Studio cache
+.vs/
+
+# Build output
+bin/
+obj/
+
+# User-specific
+*.user
+*.rsuser
+*.suo
