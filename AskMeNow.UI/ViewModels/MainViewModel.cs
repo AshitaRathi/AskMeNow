@@ -208,10 +208,53 @@ public class MainViewModel : INotifyPropertyChanged
             Messages.Remove(loadingMessage);
             
             IsDocumentsLoaded = true;
-            StatusMessage = $"Loaded {documents.Count} documents. Ready to answer questions!";
             
-            // Add success message
-            AddMessage($"✅ Successfully loaded {documents.Count} documents from the selected folder. You can now ask questions about the content!", MessageSender.AI);
+            // Get file processing statistics
+            var processingResult = _questionHandler.GetLastProcessingResult();
+            
+            if (processingResult != null)
+            {
+                // Create detailed status message
+                var supportedExtensions = string.Join(", ", processingResult.SupportedExtensions.Select(ext => ext.TrimStart('.')));
+                var unsupportedExtensions = processingResult.UnsupportedExtensions.Any() 
+                    ? string.Join(", ", processingResult.UnsupportedExtensions.Select(ext => ext.TrimStart('.')))
+                    : "none";
+                
+                StatusMessage = $"Loaded {processingResult.SuccessfullyProcessed} supported files. Skipped {processingResult.UnsupportedFilesFound} unsupported files.";
+                
+                // Add detailed success message
+                var message = $"✅ Document processing complete!\n\n";
+                message += $"📄 **Successfully processed:** {processingResult.SuccessfullyProcessed} files\n";
+                message += $"📁 **Supported file types:** {supportedExtensions}\n";
+                
+                if (processingResult.UnsupportedFilesFound > 0)
+                {
+                    message += $"⚠️ **Skipped unsupported files:** {processingResult.UnsupportedFilesFound} files\n";
+                    message += $"🚫 **Unsupported file types:** {unsupportedExtensions}\n";
+                }
+                
+                if (processingResult.FailedToProcess > 0)
+                {
+                    message += $"❌ **Failed to process:** {processingResult.FailedToProcess} files\n";
+                }
+                
+                message += $"\nYou can now ask questions about the content from any of the processed documents!";
+                
+                AddMessage(message, MessageSender.AI);
+            }
+            else
+            {
+                // Fallback to simple counting if processing result is not available
+                var fileTypeCounts = documents
+                    .GroupBy(d => Path.GetExtension(d.FilePath).ToLowerInvariant())
+                    .ToDictionary(g => g.Key, g => g.Count());
+                
+                var fileTypeSummary = string.Join(", ", fileTypeCounts.Select(kvp => $"{kvp.Value} {kvp.Key.TrimStart('.')}"));
+                StatusMessage = $"Loaded {documents.Count} files ({fileTypeSummary}). Ready to answer questions!";
+                
+                var fileTypeDetails = string.Join(", ", fileTypeCounts.Select(kvp => $"{kvp.Value} {kvp.Key.TrimStart('.')} files"));
+                AddMessage($"✅ Successfully loaded {documents.Count} documents from the selected folder:\n\n📄 {fileTypeDetails}\n\nYou can now ask questions about the content from any of these documents!", MessageSender.AI);
+            }
         }
         catch (Exception ex)
         {

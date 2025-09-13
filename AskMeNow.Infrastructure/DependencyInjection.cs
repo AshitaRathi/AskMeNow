@@ -16,6 +16,7 @@ public static class DependencyInjection
 
         // Services
         services.AddScoped<IBedrockClientService, BedrockClientService>();
+        services.AddScoped<IDocumentParserService, DocumentParserService>();
         services.AddScoped<IDocumentRepository, DocumentRepository>();
         services.AddScoped<IDocumentChunkingService, DocumentChunkingService>();
         services.AddScoped<IDocumentCacheService, DocumentCacheService>();

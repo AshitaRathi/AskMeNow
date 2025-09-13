@@ -1,5 +1,6 @@
 using AskMeNow.Application.Services;
 using AskMeNow.Core.Entities;
+using AskMeNow.Core.Interfaces;
 
 namespace AskMeNow.Application.Handlers;
 
@@ -7,15 +8,18 @@ public interface IQuestionHandler
 {
     Task<FAQAnswer> ProcessQuestionAsync(string question);
     Task<List<FAQDocument>> InitializeDocumentsAsync(string folderPath);
+    FileProcessingResult? GetLastProcessingResult();
 }
 
 public class QuestionHandler : IQuestionHandler
 {
     private readonly IFAQService _faqService;
+    private readonly IDocumentCacheService _documentCacheService;
 
-    public QuestionHandler(IFAQService faqService)
+    public QuestionHandler(IFAQService faqService, IDocumentCacheService documentCacheService)
     {
         _faqService = faqService;
+        _documentCacheService = documentCacheService;
     }
 
     public async Task<FAQAnswer> ProcessQuestionAsync(string question)
@@ -44,5 +48,10 @@ public class QuestionHandler : IQuestionHandler
         }
 
         return await _faqService.LoadDocumentsAsync(folderPath);
+    }
+
+    public FileProcessingResult? GetLastProcessingResult()
+    {
+        return _documentCacheService.GetLastProcessingResult();
     }
 }

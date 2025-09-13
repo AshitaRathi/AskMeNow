@@ -11,6 +11,7 @@ public class DocumentCacheService : IDocumentCacheService
     private readonly ConcurrentDictionary<string, List<FAQDocument>> _documentCache = new();
     private readonly ConcurrentDictionary<string, string> _contentCache = new();
     private readonly ConcurrentDictionary<string, List<DocumentChunk>> _chunkCache = new();
+    private readonly ConcurrentDictionary<string, FileProcessingResult> _processingResultCache = new();
     private string _currentFolderPath = string.Empty;
 
     public DocumentCacheService(IDocumentRepository documentRepository, IDocumentChunkingService chunkingService)
@@ -44,8 +45,15 @@ public class DocumentCacheService : IDocumentCacheService
         _chunkCache.TryAdd(folderPath, chunks);
         
         // Cache the combined content
-        var combinedContent = string.Join("\n\n", documents.Select(d => $"Document: {d.Title}\n{d.Content}"));
+        var combinedContent = string.Join("\n\n", documents.Select(d => $"Document: {d.Title} ({Path.GetExtension(d.FilePath)})\n{d.Content}"));
         _contentCache.TryAdd(folderPath, combinedContent);
+        
+        // Cache the processing result
+        var processingResult = _documentRepository.GetLastProcessingResult();
+        if (processingResult != null)
+        {
+            _processingResultCache.TryAdd(folderPath, processingResult);
+        }
         
         _currentFolderPath = folderPath;
         
@@ -78,11 +86,20 @@ public class DocumentCacheService : IDocumentCacheService
         return GetCachedContent();
     }
 
+    public FileProcessingResult? GetLastProcessingResult()
+    {
+        if (string.IsNullOrEmpty(_currentFolderPath))
+            return null;
+
+        return _processingResultCache.TryGetValue(_currentFolderPath, out var result) ? result : null;
+    }
+
     public void ClearCache()
     {
         _documentCache.Clear();
         _contentCache.Clear();
         _chunkCache.Clear();
+        _processingResultCache.Clear();
         _currentFolderPath = string.Empty;
     }
 }
