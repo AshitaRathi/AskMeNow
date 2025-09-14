@@ -1,0 +1,151 @@
+<UserControl x:Class="AskMeNow.UI.Views.SidebarDocumentList"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:entities="clr-namespace:AskMeNow.Core.Entities;assembly=AskMeNow.Core"
+             mc:Ignorable="d" 
+             d:DesignHeight="400" d:DesignWidth="250">
+    
+    <UserControl.Resources>
+        <!-- Document Item Style -->
+        <Style x:Key="DocumentItemStyle" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="BorderBrush" Value="#E5E7EB"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#000000" 
+                                      Opacity="0.05" 
+                                      BlurRadius="4" 
+                                      ShadowDepth="1"/>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F8FAFC"/>
+                    <Setter Property="BorderBrush" Value="#4F8CFF"/>
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect Color="#4F8CFF" 
+                                              Opacity="0.2" 
+                                              BlurRadius="8" 
+                                              ShadowDepth="2"/>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                  Margin="20,0,20,20">
+        <StackPanel>
+            <TextBlock Text="Loaded Documents" 
+                       FontSize="14" 
+                       FontWeight="SemiBold" 
+                       Foreground="#374151" 
+                       Margin="0,0,0,12"/>
+            
+            <ItemsControl ItemsSource="{Binding LoadedDocuments}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type entities:DocumentInfo}">
+                        <Border Style="{StaticResource DocumentItemStyle}"
+                                MouseLeftButtonUp="DocumentItem_Click">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <!-- File Type Icon -->
+                                <Ellipse Grid.Column="0" 
+                                        Width="24" Height="24" 
+                                        Margin="0,0,12,0">
+                                    <Ellipse.Style>
+                                        <Style TargetType="Ellipse">
+                                            <Setter Property="Fill" Value="#6B7280"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding FileExtension}" Value=".pdf">
+                                                    <Setter Property="Fill" Value="#DC2626"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FileExtension}" Value=".docx">
+                                                    <Setter Property="Fill" Value="#2563EB"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FileExtension}" Value=".doc">
+                                                    <Setter Property="Fill" Value="#2563EB"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FileExtension}" Value=".xlsx">
+                                                    <Setter Property="Fill" Value="#059669"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FileExtension}" Value=".xls">
+                                                    <Setter Property="Fill" Value="#059669"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FileExtension}" Value=".txt">
+                                                    <Setter Property="Fill" Value="#6B7280"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FileExtension}" Value=".md">
+                                                    <Setter Property="Fill" Value="#7C3AED"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FileExtension}" Value=".json">
+                                                    <Setter Property="Fill" Value="#D97706"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FileExtension}" Value=".html">
+                                                    <Setter Property="Fill" Value="#EA580C"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Ellipse.Style>
+                                </Ellipse>
+                                
+                                <!-- File Info -->
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding Title}" 
+                                               FontSize="12" 
+                                               FontWeight="Medium" 
+                                               Foreground="#111827" 
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding FileExtension, StringFormat='{}{0} file'}" 
+                                               FontSize="10" 
+                                               Foreground="#6B7280" 
+                                               Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding WordCount, StringFormat='{}{0} words'}" 
+                                               FontSize="10" 
+                                               Foreground="#6B7280"/>
+                                </StackPanel>
+                                
+                                <!-- Preview Icon -->
+                                <Grid Grid.Column="2" 
+                                      Width="20" Height="20" 
+                                      ToolTip="Click to preview document">
+                                    <Ellipse Fill="#4F8CFF" 
+                                             Opacity="0.1">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Opacity" Value="0.1"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Opacity" Value="0.3"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
+                                    <TextBlock Text="👁" 
+                                               FontSize="10" 
+                                               HorizontalAlignment="Center" 
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

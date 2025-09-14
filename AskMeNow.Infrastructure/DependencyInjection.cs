@@ -39,6 +39,13 @@ public static class DependencyInjection
         // Voice interaction services (using Whisper.NET + NAudio for STT)
         services.AddSingleton<ISpeechToTextService, WhisperSpeechToTextService>();
         services.AddSingleton<ITextToSpeechService, SimpleTextToSpeechService>();
+        
+        // Sentiment analysis and small talk services
+        services.AddScoped<ISentimentAnalysisService, SentimentAnalysisService>();
+        services.AddScoped<ISmallTalkService, SmallTalkService>();
+        
+        // Document preview service
+        services.AddScoped<IDocumentPreviewService, DocumentPreviewService>();
 
         return services;
     }

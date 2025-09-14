@@ -1,7 +1,6 @@
 using AskMeNow.Application.Services;
 using AskMeNow.Core.Entities;
 using AskMeNow.Core.Interfaces;
-using System.Text.RegularExpressions;
 
 namespace AskMeNow.Application.Handlers;
 
@@ -17,11 +16,19 @@ public class QuestionHandler : IQuestionHandler
 {
     private readonly IFAQService _faqService;
     private readonly IDocumentCacheService _documentCacheService;
+    private readonly ISentimentAnalysisService _sentimentAnalysisService;
+    private readonly ISmallTalkService _smallTalkService;
 
-    public QuestionHandler(IFAQService faqService, IDocumentCacheService documentCacheService)
+    public QuestionHandler(
+        IFAQService faqService, 
+        IDocumentCacheService documentCacheService,
+        ISentimentAnalysisService sentimentAnalysisService,
+        ISmallTalkService smallTalkService)
     {
         _faqService = faqService;
         _documentCacheService = documentCacheService;
+        _sentimentAnalysisService = sentimentAnalysisService;
+        _smallTalkService = smallTalkService;
     }
 
     public async Task<FAQAnswer> ProcessQuestionAsync(string question)
@@ -39,18 +46,11 @@ public class QuestionHandler : IQuestionHandler
         // Sanitize the question
         var sanitizedQuestion = question.Trim();
         
-        // Check if the question is a greeting or small talk
-        if (IsGreetingOrSmallTalk(sanitizedQuestion))
-        {
-            return new FAQAnswer
-            {
-                Question = sanitizedQuestion,
-                Answer = GetGreetingResponse(sanitizedQuestion),
-                Source = "AI Assistant"
-            };
-        }
+        // Analyze sentiment and intent
+        var analysis = await _sentimentAnalysisService.AnalyzeAsync(sanitizedQuestion);
         
-        return await _faqService.AnswerQuestionAsync(sanitizedQuestion);
+        // Route based on intent
+        return await RouteMessageAsync(sanitizedQuestion, analysis, null);
     }
 
     public async Task<FAQAnswer> ProcessQuestionAsync(string question, string conversationId)
@@ -68,19 +68,11 @@ public class QuestionHandler : IQuestionHandler
         // Sanitize the question
         var sanitizedQuestion = question.Trim();
         
-        // Check if the question is a greeting or small talk
-        if (IsGreetingOrSmallTalk(sanitizedQuestion))
-        {
-            return new FAQAnswer
-            {
-                Question = sanitizedQuestion,
-                Answer = GetGreetingResponse(sanitizedQuestion),
-                Source = "AI Assistant"
-            };
-        }
+        // Analyze sentiment and intent
+        var analysis = await _sentimentAnalysisService.AnalyzeAsync(sanitizedQuestion);
         
-        // Process as a normal document-based question with optional conversation context
-        return await _faqService.AnswerQuestionAsync(sanitizedQuestion, conversationId);
+        // Route based on intent
+        return await RouteMessageAsync(sanitizedQuestion, analysis, conversationId);
     }
 
     public async Task<List<FAQDocument>> InitializeDocumentsAsync(string folderPath)
@@ -98,112 +90,48 @@ public class QuestionHandler : IQuestionHandler
         return _documentCacheService.GetLastProcessingResult();
     }
 
-    private bool IsGreetingOrSmallTalk(string question)
+    private async Task<FAQAnswer> RouteMessageAsync(string question, SentimentAnalysisResult analysis, string? conversationId)
     {
-        if (string.IsNullOrWhiteSpace(question))
-            return false;
-
-        // Convert to lowercase for case-insensitive matching
-        var lowerQuestion = question.ToLowerInvariant().Trim();
-        
-        // Remove extra whitespace and punctuation for better matching
-        var normalizedQuestion = Regex.Replace(lowerQuestion, @"[^\w\s]", "").Trim();
-        var words = normalizedQuestion.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        
-        // Define greeting patterns
-        var greetingPatterns = new[]
+        // Handle greetings and small talk
+        if (_smallTalkService.CanHandle(analysis))
         {
-            // Basic greetings
-            "hi", "hello", "hey", "hiya", "howdy",
-            
-            // Time-based greetings
-            "good morning", "good afternoon", "good evening", "good night",
-            "morning", "afternoon", "evening",
-            
-            // How are you variations
-            "how are you", "how are you doing", "how do you do", "how's it going",
-            "what's up", "whats up", "sup", "howdy",
-            
-            // Casual greetings
-            "hey there", "hi there", "hello there",
-            "hi bot", "hello bot", "hey bot",
-            "hi assistant", "hello assistant", "hey assistant",
-            
-            // Simple acknowledgments
-            "thanks", "thank you", "bye", "goodbye", "see you later"
-        };
-
-        // Check for exact matches
-        foreach (var pattern in greetingPatterns)
-        {
-            if (normalizedQuestion == pattern || normalizedQuestion.StartsWith(pattern + " "))
-                return true;
+            var response = await _smallTalkService.GetResponseAsync(question, analysis);
+            return new FAQAnswer
+            {
+                Question = question,
+                Answer = response,
+                Source = "AI Assistant"
+            };
         }
 
-        // Check for single word greetings
-        if (words.Length == 1)
+        // Handle questions and complaints with document search
+        var faqAnswer = conversationId != null 
+            ? await _faqService.AnswerQuestionAsync(question, conversationId)
+            : await _faqService.AnswerQuestionAsync(question);
+
+        // Add empathetic response for complaints with negative sentiment
+        if (analysis.Intent == Intent.Complaint && analysis.Sentiment == Sentiment.Negative)
         {
-            var singleWordGreetings = new[] { "hi", "hello", "hey", "hiya", "howdy", "morning", "afternoon", "evening", "thanks", "bye" };
-            if (singleWordGreetings.Contains(words[0]))
-                return true;
+            faqAnswer.Answer = PrependEmpatheticResponse(faqAnswer.Answer);
         }
 
-        // Check for "how are you" variations
-        if (words.Length >= 2 && words[0] == "how" && (words[1] == "are" || words[1] == "do"))
-            return true;
-
-        // Check for "what's up" variations
-        if (words.Length >= 2 && words[0] == "what" && words[1] == "up")
-            return true;
-
-        return false;
+        return faqAnswer;
     }
 
-    private string GetGreetingResponse(string question)
+    private string PrependEmpatheticResponse(string originalAnswer)
     {
-        var lowerQuestion = question.ToLowerInvariant().Trim();
-        var normalizedQuestion = Regex.Replace(lowerQuestion, @"[^\w\s]", "").Trim();
+        var empatheticResponses = new[]
+        {
+            "I understand your frustration and I'm sorry you're experiencing this issue. ",
+            "I can see this is really bothering you, and I want to help resolve this. ",
+            "I'm sorry to hear about this problem. Let me help you find a solution. ",
+            "I understand how frustrating this must be. Here's what I can tell you: ",
+            "I'm sorry you're having this issue. I'm here to help you resolve it. "
+        };
+
+        var random = new Random();
+        var empatheticPrefix = empatheticResponses[random.Next(empatheticResponses.Length)];
         
-        // Time-based responses
-        var currentHour = DateTime.Now.Hour;
-        if (normalizedQuestion.Contains("morning") || (currentHour >= 5 && currentHour < 12))
-        {
-            return "Good morning! Ready to answer your questions.";
-        }
-        else if (normalizedQuestion.Contains("afternoon") || (currentHour >= 12 && currentHour < 17))
-        {
-            return "Good afternoon! How can I help you today?";
-        }
-        else if (normalizedQuestion.Contains("evening") || normalizedQuestion.Contains("night") || (currentHour >= 17 || currentHour < 5))
-        {
-            return "Good evening! I'm here to assist you with your questions.";
-        }
-        
-        // How are you responses
-        if (normalizedQuestion.Contains("how are you") || normalizedQuestion.Contains("how do you do"))
-        {
-            return "I'm doing great, thank you! How can I assist you today?";
-        }
-        
-        // What's up responses
-        if (normalizedQuestion.Contains("what up") || normalizedQuestion.Contains("whats up") || normalizedQuestion.Contains("sup"))
-        {
-            return "Not much! Just ready to help you with any questions you might have.";
-        }
-        
-        // Thanks responses
-        if (normalizedQuestion.Contains("thank") || normalizedQuestion.Contains("thanks"))
-        {
-            return "You're welcome! Is there anything else I can help you with?";
-        }
-        
-        // Goodbye responses
-        if (normalizedQuestion.Contains("bye") || normalizedQuestion.Contains("goodbye") || normalizedQuestion.Contains("see you"))
-        {
-            return "Goodbye! Feel free to come back anytime if you have more questions.";
-        }
-        
-        // Default greeting response
-        return "Hello! How can I help you today?";
+        return empatheticPrefix + originalAnswer;
     }
 }

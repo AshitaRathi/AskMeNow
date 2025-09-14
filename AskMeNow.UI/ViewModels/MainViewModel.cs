@@ -18,6 +18,7 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly IFileWatcherService _fileWatcherService;
     private readonly IConversationService _conversationService;
     private readonly IAutoSuggestService _autoSuggestService;
+    private readonly IDocumentPreviewService _documentPreviewService;
     private string _userQuestion = string.Empty;
     private bool _isLoading = false;
     private string _statusMessage = "Welcome to AskMeNow! Please select a folder containing documents to begin.";
@@ -42,7 +43,8 @@ public class MainViewModel : INotifyPropertyChanged
         IPersistentKnowledgeBaseService knowledgeBaseService,
         IFileWatcherService fileWatcherService,
         IConversationService conversationService,
-        IAutoSuggestService autoSuggestService)
+        IAutoSuggestService autoSuggestService,
+        IDocumentPreviewService documentPreviewService)
     {
         _questionHandler = questionHandler;
         _speechToTextService = speechToTextService;
@@ -51,6 +53,7 @@ public class MainViewModel : INotifyPropertyChanged
         _fileWatcherService = fileWatcherService;
         _conversationService = conversationService;
         _autoSuggestService = autoSuggestService;
+        _documentPreviewService = documentPreviewService;
         
         AskCommand = new RelayCommand(async () => await AskQuestionAsync(), () => !IsLoading && IsDocumentsLoaded && !string.IsNullOrWhiteSpace(UserQuestion));
         SelectFolderCommand = new RelayCommand(SelectFolder);
@@ -248,6 +251,8 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    public IDocumentPreviewService DocumentPreviewService => _documentPreviewService;
+
     private async Task AskQuestionAsync()
     {
         if (string.IsNullOrWhiteSpace(UserQuestion))
@@ -285,6 +290,12 @@ public class MainViewModel : INotifyPropertyChanged
             
             // Add AI response with suggested questions
             AddMessage(answer.Answer, MessageSender.AI, answer.DocumentSnippets, answer.SuggestedQuestions);
+            
+            // Update document highlights based on referenced snippets
+            if (answer.DocumentSnippets?.Any() == true)
+            {
+                _ = Task.Run(async () => await UpdateDocumentHighlightsAsync(answer.DocumentSnippets));
+            }
             
             // Speak the AI response if voice is enabled
             if (IsVoiceEnabled)
@@ -762,6 +773,32 @@ public class MainViewModel : INotifyPropertyChanged
     {
         // Log TTS errors but don't show to user
         System.Diagnostics.Debug.WriteLine($"TTS Error: {error}");
+    }
+
+    #endregion
+
+    #region Document Preview Methods
+
+    private async Task UpdateDocumentHighlightsAsync(List<DocumentSnippet> documentSnippets)
+    {
+        try
+        {
+            // Group snippets by file path
+            var snippetsByFile = documentSnippets.GroupBy(s => s.FilePath);
+            
+            foreach (var group in snippetsByFile)
+            {
+                var filePath = group.Key;
+                var snippets = group.ToList();
+                
+                await _documentPreviewService.UpdateHighlightsAsync(filePath, snippets);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't show to user
+            System.Diagnostics.Debug.WriteLine($"Error updating document highlights: {ex.Message}");
+        }
     }
 
     #endregion

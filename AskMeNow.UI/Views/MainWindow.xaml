@@ -6,6 +6,7 @@
         xmlns:vm="clr-namespace:AskMeNow.UI.ViewModels"
         xmlns:entities="clr-namespace:AskMeNow.Core.Entities;assembly=AskMeNow.Core"
         xmlns:converters="clr-namespace:AskMeNow.UI.Converters"
+        xmlns:views="clr-namespace:AskMeNow.UI.Views"
         mc:Ignorable="d"
         Title="AskMeNow - AI Q/A Chat" 
         Height="800" 
@@ -473,99 +474,7 @@
                            TextAlignment="Center"/>
 
                 <!-- Documents List -->
-                <ScrollViewer Grid.Row="2" 
-                             VerticalScrollBarVisibility="Auto" 
-                             Margin="20,0,20,20">
-                    <StackPanel>
-                        <TextBlock Text="Loaded Documents" 
-                                   FontSize="14" 
-                                   FontWeight="SemiBold" 
-                                   Foreground="#374151" 
-                                   Margin="0,0,0,12"/>
-                        
-                        <ItemsControl ItemsSource="{Binding LoadedDocuments}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="White" 
-                                           CornerRadius="8" 
-                                           Padding="12,8" 
-                                           Margin="0,0,0,8"
-                                           BorderBrush="#E5E7EB" 
-                                           BorderThickness="1">
-                                        <Border.Effect>
-                                            <DropShadowEffect Color="#000000" 
-                                                            Opacity="0.05" 
-                                                            BlurRadius="4" 
-                                                            ShadowDepth="1"/>
-                                        </Border.Effect>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            
-                                            <!-- File Type Icon -->
-                                            <Ellipse Grid.Column="0" 
-                                                    Width="24" Height="24" 
-                                                    Margin="0,0,12,0">
-                                                <Ellipse.Style>
-                                                    <Style TargetType="Ellipse">
-                                                        <Setter Property="Fill" Value="#6B7280"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding FileExtension}" Value=".pdf">
-                                                                <Setter Property="Fill" Value="#DC2626"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding FileExtension}" Value=".docx">
-                                                                <Setter Property="Fill" Value="#2563EB"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding FileExtension}" Value=".doc">
-                                                                <Setter Property="Fill" Value="#2563EB"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding FileExtension}" Value=".xlsx">
-                                                                <Setter Property="Fill" Value="#059669"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding FileExtension}" Value=".xls">
-                                                                <Setter Property="Fill" Value="#059669"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding FileExtension}" Value=".txt">
-                                                                <Setter Property="Fill" Value="#6B7280"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding FileExtension}" Value=".md">
-                                                                <Setter Property="Fill" Value="#7C3AED"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding FileExtension}" Value=".json">
-                                                                <Setter Property="Fill" Value="#D97706"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding FileExtension}" Value=".html">
-                                                                <Setter Property="Fill" Value="#EA580C"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Ellipse.Style>
-                                            </Ellipse>
-                                            
-                                            <!-- File Info -->
-                                            <StackPanel Grid.Column="1">
-                                                <TextBlock Text="{Binding Title}" 
-                                                           FontSize="12" 
-                                                           FontWeight="Medium" 
-                                                           Foreground="#111827" 
-                                                           TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding FileExtension, StringFormat='{}{0} file'}" 
-                                                           FontSize="10" 
-                                                           Foreground="#6B7280" 
-                                                           Margin="0,2,0,0"/>
-                                                <TextBlock Text="{Binding WordCount, StringFormat='{}{0} words'}" 
-                                                           FontSize="10" 
-                                                           Foreground="#6B7280"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </ScrollViewer>
+                <views:SidebarDocumentList Grid.Row="2" DataContext="{Binding}"/>
             </Grid>
         </Border>
 
