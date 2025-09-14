@@ -20,6 +20,10 @@ public static class DependencyInjection
         services.AddScoped<IDocumentRepository, DocumentRepository>();
         services.AddScoped<IDocumentChunkingService, DocumentChunkingService>();
         services.AddScoped<IDocumentCacheService, DocumentCacheService>();
+        
+        // Voice interaction services (using Whisper.NET + NAudio for STT)
+        services.AddSingleton<ISpeechToTextService, WhisperSpeechToTextService>();
+        services.AddSingleton<ITextToSpeechService, SimpleTextToSpeechService>();
 
         return services;
     }

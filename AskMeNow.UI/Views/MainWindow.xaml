@@ -5,8 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:AskMeNow.UI.ViewModels"
         xmlns:entities="clr-namespace:AskMeNow.Core.Entities;assembly=AskMeNow.Core"
+        xmlns:converters="clr-namespace:AskMeNow.UI.Converters"
         mc:Ignorable="d"
-        Title="AskMeNow - AI FAQ Chat" 
+        Title="AskMeNow - AI Q/A Chat" 
         Height="800" 
         Width="1000"
         WindowStartupLocation="CenterScreen"
@@ -16,6 +17,10 @@
         MinWidth="800">
     
     <Window.Resources>
+        <!-- Converters -->
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <converters:RecordingLevelConverter x:Key="RecordingLevelConverter"/>
+        
         <!-- Modern Button Style -->
         <Style x:Key="ModernButton" TargetType="Button">
             <Setter Property="Background" Value="#4F8CFF"/>
@@ -309,7 +314,7 @@
                                    FontSize="18" 
                                    FontWeight="Bold" 
                                    Foreground="#1F2937"/>
-                        <TextBlock Text="AI FAQ Assistant" 
+                        <TextBlock Text="AI Q/A Assistant" 
                                    FontSize="12" 
                                    Foreground="#6B7280"/>
                     </StackPanel>
@@ -429,6 +434,7 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Chat Header -->
@@ -465,6 +471,8 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
                 <TextBox Grid.Column="0" 
@@ -483,7 +491,75 @@
                     </TextBox.InputBindings>
                 </TextBox>
                 
+                <!-- Voice Recording Button -->
                 <Button Grid.Column="1" 
+                        Command="{Binding VoiceAskCommand}"
+                        Width="60"
+                        MinHeight="60"
+                        VerticalAlignment="Top"
+                        Margin="0,0,10,0"
+                        ToolTip="Voice Ask - Click to record your question">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                            <Setter Property="Background" Value="#10B981"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                    <Setter Property="Background" Value="#EF4444"/>
+                                    <Setter Property="Content">
+                                        <Setter.Value>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="⏹" FontSize="16" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Setter.Value>
+                                    </Setter>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsVoiceEnabled}" Value="False">
+                                    <Setter Property="Background" Value="#D1D5DB"/>
+                                    <Setter Property="IsEnabled" Value="False"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <Button.Content>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🎤" FontSize="16" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button.Content>
+                </Button>
+                
+                <!-- Mute/Unmute Button -->
+                <Button Grid.Column="2" 
+                        Command="{Binding ToggleMuteCommand}"
+                        Width="60"
+                        MinHeight="60"
+                        VerticalAlignment="Top"
+                        Margin="0,0,10,0"
+                        ToolTip="Toggle AI Voice Response">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                            <Setter Property="Background" Value="#6B7280"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                    <Setter Property="Background" Value="#EF4444"/>
+                                    <Setter Property="Content">
+                                        <Setter.Value>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="🔇" FontSize="16" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Setter.Value>
+                                    </Setter>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <Button.Content>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔊" FontSize="16" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button.Content>
+                </Button>
+                
+                <Button Grid.Column="3" 
                         Content="Send" 
                         Command="{Binding AskCommand}"
                         Style="{StaticResource ModernButton}"
@@ -492,8 +568,44 @@
                         VerticalAlignment="Top"/>
             </Grid>
 
+            <!-- Recording Level Indicator -->
+            <Border Grid.Row="3" 
+                    Background="#FEF3C7" 
+                    BorderBrush="#F59E0B" 
+                    BorderThickness="1" 
+                    CornerRadius="8" 
+                    Padding="12,8" 
+                    Margin="0,0,0,20"
+                    Visibility="{Binding IsRecording, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="🎤 Recording..." 
+                               FontSize="14" 
+                               FontWeight="SemiBold" 
+                               Foreground="#92400E" 
+                               VerticalAlignment="Center"
+                               Margin="0,0,12,0"/>
+                    <Border Background="#F3F4F6" 
+                            BorderBrush="#D1D5DB" 
+                            BorderThickness="1" 
+                            CornerRadius="4" 
+                            Width="200" 
+                            Height="8"
+                            VerticalAlignment="Center">
+                        <Border Background="#10B981" 
+                                CornerRadius="3" 
+                                HorizontalAlignment="Left"
+                                Width="{Binding RecordingLevel, Converter={StaticResource RecordingLevelConverter}}"/>
+                    </Border>
+                    <TextBlock Text="{Binding RecordingLevel, StringFormat='{}{0:P0}'}" 
+                               FontSize="12" 
+                               Foreground="#6B7280" 
+                               VerticalAlignment="Center"
+                               Margin="8,0,0,0"/>
+                </StackPanel>
+            </Border>
+
             <!-- Export Button -->
-            <Button Grid.Row="3" 
+            <Button Grid.Row="4" 
                     Content="📄 Export Conversation" 
                     Command="{Binding ExportCommand}"
                     Style="{StaticResource SecondaryButton}"

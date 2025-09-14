@@ -1,5 +1,6 @@
 using AskMeNow.Application.Handlers;
 using AskMeNow.Core.Entities;
+using AskMeNow.Core.Interfaces;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -11,21 +12,45 @@ namespace AskMeNow.UI.ViewModels;
 public class MainViewModel : INotifyPropertyChanged
 {
     private readonly IQuestionHandler _questionHandler;
+    private readonly ISpeechToTextService _speechToTextService;
+    private readonly ITextToSpeechService _textToSpeechService;
     private string _userQuestion = string.Empty;
     private bool _isLoading = false;
     private string _statusMessage = "Welcome to AskMeNow! Please select a folder containing documents to begin.";
     private bool _isDocumentsLoaded = false;
     private bool _isFolderSelectionInProgress = false;
+    private bool _isRecording = false;
+    private bool _isVoiceEnabled = true;
+    private bool _isMuted = false;
+    private float _recordingLevel = 0f;
+    private CancellationTokenSource? _recordingCancellationTokenSource;
     private ObservableCollection<Message> _messages = new();
     private ObservableCollection<DocumentInfo> _loadedDocuments = new();
 
-    public MainViewModel(IQuestionHandler questionHandler)
+    public MainViewModel(IQuestionHandler questionHandler, ISpeechToTextService speechToTextService, ITextToSpeechService textToSpeechService)
     {
         _questionHandler = questionHandler;
+        _speechToTextService = speechToTextService;
+        _textToSpeechService = textToSpeechService;
+        
         AskCommand = new RelayCommand(async () => await AskQuestionAsync(), () => !IsLoading && IsDocumentsLoaded && !string.IsNullOrWhiteSpace(UserQuestion));
         SelectFolderCommand = new RelayCommand(SelectFolder);
         ExportCommand = new RelayCommand(ExportConversation, () => Messages.Any(m => m.Sender == MessageSender.User));
         EnterKeyCommand = new RelayCommand(async () => await HandleEnterKeyAsync());
+        VoiceAskCommand = new RelayCommand(async () => await StartVoiceRecordingAsync(), () => !IsLoading && IsDocumentsLoaded && IsVoiceEnabled && !IsRecording);
+        StopRecordingCommand = new RelayCommand(StopVoiceRecording, () => IsRecording);
+        ToggleMuteCommand = new RelayCommand(ToggleMute);
+        
+        // Subscribe to voice service events
+        _speechToTextService.RecordingStarted += OnRecordingStarted;
+        _speechToTextService.RecordingStopped += OnRecordingStopped;
+        _speechToTextService.RecordingLevelChanged += OnRecordingLevelChanged;
+        _textToSpeechService.SpeechStarted += OnSpeechStarted;
+        _textToSpeechService.SpeechCompleted += OnSpeechCompleted;
+        _textToSpeechService.SpeechError += OnSpeechError;
+        
+        // Initialize voice services
+        _ = Task.Run(async () => await InitializeVoiceServicesAsync());
         
         // Add welcome message
         AddMessage("Welcome to AskMeNow! Loading your documents...", MessageSender.AI);
@@ -50,6 +75,7 @@ public class MainViewModel : INotifyPropertyChanged
             _isLoading = value;
             OnPropertyChanged();
             ((RelayCommand)AskCommand).RaiseCanExecuteChanged();
+            ((RelayCommand)VoiceAskCommand).RaiseCanExecuteChanged();
         }
     }
 
@@ -71,6 +97,7 @@ public class MainViewModel : INotifyPropertyChanged
             _isDocumentsLoaded = value;
             OnPropertyChanged();
             ((RelayCommand)AskCommand).RaiseCanExecuteChanged();
+            ((RelayCommand)VoiceAskCommand).RaiseCanExecuteChanged();
         }
     }
 
@@ -99,6 +126,52 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand SelectFolderCommand { get; }
     public ICommand ExportCommand { get; }
     public ICommand EnterKeyCommand { get; }
+    public ICommand VoiceAskCommand { get; }
+    public ICommand StopRecordingCommand { get; }
+    public ICommand ToggleMuteCommand { get; }
+
+    public bool IsRecording
+    {
+        get => _isRecording;
+        set
+        {
+            _isRecording = value;
+            OnPropertyChanged();
+            ((RelayCommand)VoiceAskCommand).RaiseCanExecuteChanged();
+            ((RelayCommand)StopRecordingCommand).RaiseCanExecuteChanged();
+        }
+    }
+
+    public bool IsVoiceEnabled
+    {
+        get => _isVoiceEnabled;
+        set
+        {
+            _isVoiceEnabled = value;
+            OnPropertyChanged();
+            ((RelayCommand)VoiceAskCommand).RaiseCanExecuteChanged();
+        }
+    }
+
+    public float RecordingLevel
+    {
+        get => _recordingLevel;
+        set
+        {
+            _recordingLevel = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool IsMuted
+    {
+        get => _isMuted;
+        set
+        {
+            _isMuted = value;
+            OnPropertyChanged();
+        }
+    }
 
     private async Task AskQuestionAsync()
     {
@@ -132,6 +205,12 @@ public class MainViewModel : INotifyPropertyChanged
             
             // Add AI response
             AddMessage(answer.Answer, MessageSender.AI);
+            
+            // Speak the AI response if voice is enabled
+            if (IsVoiceEnabled)
+            {
+                _ = Task.Run(async () => await SpeakResponseAsync(answer.Answer));
+            }
             
             StatusMessage = "Ready to answer your questions.";
         }
@@ -361,6 +440,136 @@ public class MainViewModel : INotifyPropertyChanged
         
         return text.Split(new char[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length;
     }
+
+    #region Voice Interaction Methods
+
+    private async Task InitializeVoiceServicesAsync()
+    {
+        try
+        {
+            await _speechToTextService.InitializeAsync();
+            // TTS service doesn't need explicit initialization
+        }
+        catch (Exception ex)
+        {
+            // If voice services fail to initialize, disable voice features
+            IsVoiceEnabled = false;
+            System.Diagnostics.Debug.WriteLine($"Voice services initialization failed: {ex.Message}");
+        }
+    }
+
+    private async Task StartVoiceRecordingAsync()
+    {
+        if (IsRecording) return;
+
+        try
+        {
+            IsRecording = true;
+            StatusMessage = "Recording... Speak your question";
+            
+            _recordingCancellationTokenSource = new CancellationTokenSource();
+            
+            // Start recording and transcription
+            var transcribedText = await _speechToTextService.RecordAndTranscribeAsync(15, _recordingCancellationTokenSource.Token);
+            
+            if (!string.IsNullOrWhiteSpace(transcribedText) && transcribedText != "No speech detected")
+            {
+                // Set the transcribed text as the user question
+                UserQuestion = transcribedText;
+                
+                // Automatically send the question to the chatbot
+                await AskQuestionAsync();
+            }
+            else
+            {
+                StatusMessage = "No speech detected. Please try again.";
+                AddMessage("No speech was detected. Please try speaking more clearly or check your microphone.", MessageSender.AI);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Recording cancelled";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Voice recording error: {ex.Message}";
+            AddMessage($"❌ Voice recording failed: {ex.Message}", MessageSender.AI);
+        }
+        finally
+        {
+            IsRecording = false;
+            _recordingCancellationTokenSource?.Dispose();
+            _recordingCancellationTokenSource = null;
+        }
+    }
+
+    private void StopVoiceRecording()
+    {
+        _recordingCancellationTokenSource?.Cancel();
+    }
+
+    private void ToggleMute()
+    {
+        IsMuted = !IsMuted;
+        
+        // If we're currently speaking and user mutes, stop the speech
+        if (IsMuted && _textToSpeechService.IsSpeaking)
+        {
+            _textToSpeechService.StopSpeaking();
+        }
+    }
+
+    private async Task SpeakResponseAsync(string text)
+    {
+        if (!IsVoiceEnabled || IsMuted || string.IsNullOrWhiteSpace(text)) return;
+
+        try
+        {
+            await _textToSpeechService.SpeakAsync(text);
+        }
+        catch (Exception ex)
+        {
+            // Don't show error to user for TTS failures, just log it
+            System.Diagnostics.Debug.WriteLine($"TTS Error: {ex.Message}");
+        }
+    }
+
+    #endregion
+
+    #region Voice Service Event Handlers
+
+    private void OnRecordingStarted(object? sender, EventArgs e)
+    {
+        // Recording started event handled by the service
+    }
+
+    private void OnRecordingStopped(object? sender, EventArgs e)
+    {
+        // Recording stopped event handled by the service
+    }
+
+    private void OnRecordingLevelChanged(object? sender, float level)
+    {
+        RecordingLevel = level;
+    }
+
+    private void OnSpeechStarted(object? sender, EventArgs e)
+    {
+        // Speech started - could show visual indicator if needed
+    }
+
+    private void OnSpeechCompleted(object? sender, EventArgs e)
+    {
+        // Speech completed - could hide visual indicator if needed
+    }
+
+    private void OnSpeechError(object? sender, string error)
+    {
+        // Log TTS errors but don't show to user
+        System.Diagnostics.Debug.WriteLine($"TTS Error: {error}");
+    }
+
+    #endregion
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

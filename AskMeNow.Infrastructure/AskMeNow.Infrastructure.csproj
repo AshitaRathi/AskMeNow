@@ -19,6 +19,11 @@
     <PackageReference Include="iText7" Version="8.0.2" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.57" />
     <PackageReference Include="ClosedXML" Version="0.102.2" />
+    <!-- Voice interaction packages -->
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Whisper.net" Version="1.4.0" />
+    <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.34.0" />
+    <PackageReference Include="System.Speech" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
