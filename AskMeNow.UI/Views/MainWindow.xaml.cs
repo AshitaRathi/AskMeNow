@@ -29,4 +29,15 @@ public partial class MainWindow : Window
             ChatScrollViewer.ScrollToEnd();
         }
     }
+
+    private async void OnSuggestedQuestionClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.DataContext is AskMeNow.Core.Entities.SuggestedQuestion suggestedQuestion)
+        {
+            if (DataContext is MainViewModel viewModel)
+            {
+                await viewModel.HandleSuggestedQuestionClickAsync(suggestedQuestion.Question);
+            }
+        }
+    }
 }

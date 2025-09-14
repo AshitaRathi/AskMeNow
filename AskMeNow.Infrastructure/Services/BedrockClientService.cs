@@ -106,4 +106,58 @@ Answer:";
             return $"An error occurred while processing your question: {ex.Message}";
         }
     }
+
+    public async Task<string> GenerateSuggestionsAsync(string prompt)
+    {
+        try
+        {
+            var requestBody = new
+            {
+                anthropic_version = "bedrock-2023-05-31",
+                max_tokens = 500, // Shorter response for suggestions
+                temperature = 0.3, // Slightly higher temperature for more creative suggestions
+                messages = new[]
+                {
+                    new
+                    {
+                        role = "user",
+                        content = prompt
+                    }
+                }
+            };
+
+            var requestBodyJson = JsonSerializer.Serialize(requestBody);
+            var request = new InvokeModelRequest
+            {
+                ModelId = _awsConfig.ModelId,
+                Body = new MemoryStream(Encoding.UTF8.GetBytes(requestBodyJson)),
+                ContentType = "application/json"
+            };
+
+            var response = await _bedrockClient.InvokeModelAsync(request);
+            
+            using var reader = new StreamReader(response.Body);
+            var responseJson = await reader.ReadToEndAsync();
+            
+            var responseObject = JsonSerializer.Deserialize<JsonElement>(responseJson);
+            
+            if (responseObject.TryGetProperty("content", out var content) && 
+                content.GetArrayLength() > 0)
+            {
+                var firstContent = content[0];
+                if (firstContent.TryGetProperty("text", out var text))
+                {
+                    var suggestions = text.GetString() ?? "[]";
+                    return suggestions.Trim();
+                }
+            }
+
+            return "[]";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error generating suggestions: {ex.Message}");
+            return "[]";
+        }
+    }
 }

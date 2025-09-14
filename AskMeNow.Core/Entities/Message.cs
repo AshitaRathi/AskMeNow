@@ -14,4 +14,5 @@ public class Message
     public DateTime Timestamp { get; set; } = DateTime.Now;
     public bool IsLoading { get; set; } = false;
     public List<DocumentSnippet> DocumentSnippets { get; set; } = new();
+    public List<SuggestedQuestion> SuggestedQuestions { get; set; } = new();
 }

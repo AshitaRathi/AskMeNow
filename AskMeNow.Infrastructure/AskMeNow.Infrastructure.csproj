@@ -24,6 +24,12 @@
     <PackageReference Include="Whisper.net" Version="1.4.0" />
     <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.34.0" />
     <PackageReference Include="System.Speech" Version="8.0.0" />
+    <!-- Database and embedding packages -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.16.3" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.16.3" />
   </ItemGroup>
 
   <ItemGroup>

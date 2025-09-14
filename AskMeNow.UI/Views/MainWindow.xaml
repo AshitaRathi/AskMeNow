@@ -325,6 +325,82 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </StackPanel>
+                        
+                        <!-- Auto-Suggestions Section -->
+                        <StackPanel Margin="0,8,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsLoading}" Value="False"/>
+                                                <Condition Binding="{Binding DataContext.EnableAutoSuggestions, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            
+                            <!-- Suggestions Header -->
+                            <TextBlock Text="💡 Suggested Questions:" 
+                                       FontSize="12" 
+                                       FontWeight="SemiBold" 
+                                       Foreground="#6B7280" 
+                                       Margin="0,0,0,4"/>
+                            
+                            <!-- Suggested Questions -->
+                            <ItemsControl ItemsSource="{Binding SuggestedQuestions}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Background="#E3F2FD" 
+                                                BorderBrush="#2196F3" 
+                                                BorderThickness="1" 
+                                                Padding="12,6" 
+                                                Margin="0,0,0,4"
+                                                HorizontalAlignment="Left"
+                                                Cursor="Hand"
+                                                Click="OnSuggestedQuestionClick">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Background" Value="#E3F2FD"/>
+                                                    <Setter Property="Foreground" Value="#1976D2"/>
+                                                    <Setter Property="FontSize" Value="11"/>
+                                                    <Setter Property="FontWeight" Value="Medium"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                                        CornerRadius="16"
+                                                                        Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center" 
+                                                                                      VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="#BBDEFB"/>
+                                                            <Setter Property="Foreground" Value="#0D47A1"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsPressed" Value="True">
+                                                            <Setter Property="Background" Value="#90CAF9"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <TextBlock Text="{Binding Question}" 
+                                                       TextWrapping="Wrap" 
+                                                       MaxWidth="300"/>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -534,140 +610,181 @@
 
             <!-- Input Area - Auto-resizing TextBox with MinHeight 60px, MaxHeight 200px -->
             <Grid Grid.Row="2" Margin="0,0,0,20">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 
-                <TextBox Grid.Column="0" 
-                         Text="{Binding UserQuestion, UpdateSourceTrigger=PropertyChanged}" 
-                         Style="{StaticResource ModernTextBox}"
-                         AcceptsReturn="True"
-                         TextWrapping="Wrap"
-                         VerticalScrollBarVisibility="Auto"
-                         MinHeight="60"
-                         MaxHeight="200"
-                         VerticalAlignment="Top"
-                         FontSize="14"
-                         Margin="0,0,10,0">
-                    <TextBox.InputBindings>
-                        <KeyBinding Key="Enter" Command="{Binding EnterKeyCommand}"/>
-                    </TextBox.InputBindings>
-                </TextBox>
+                <!-- Input Row -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
                 
-                <!-- Voice Recording Button -->
-                <Button Grid.Column="1" 
-                        Command="{Binding VoiceAskCommand}"
-                        Width="60"
-                        MinHeight="60"
-                        VerticalAlignment="Top"
-                        Margin="0,0,10,0"
-                        ToolTip="Voice Ask - Click to record your question">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
-                            <Setter Property="Background" Value="#10B981"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsRecording}" Value="True">
-                                    <Setter Property="Background" Value="#EF4444"/>
-                                    <Setter Property="Content">
-                                        <Setter.Value>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="⏹" FontSize="16" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Setter.Value>
-                                    </Setter>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding IsVoiceEnabled}" Value="False">
-                                    <Setter Property="Background" Value="#D1D5DB"/>
-                                    <Setter Property="IsEnabled" Value="False"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                    <Button.Content>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="🎤" FontSize="16" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button.Content>
-                </Button>
+                    <TextBox Grid.Column="0" 
+                             Text="{Binding UserQuestion, UpdateSourceTrigger=PropertyChanged}" 
+                             Style="{StaticResource ModernTextBox}"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             MinHeight="60"
+                             MaxHeight="200"
+                             VerticalAlignment="Top"
+                             FontSize="14"
+                             Margin="0,0,10,0">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding EnterKeyCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    
+                    <Button Grid.Column="1" 
+                            Content="Send" 
+                            Command="{Binding AskCommand}"
+                            Style="{StaticResource ModernButton}"
+                            Width="100"
+                            MinHeight="60"
+                            VerticalAlignment="Top"/>
+                </Grid>
                 
-                <!-- Mute/Unmute Button -->
-                <Button Grid.Column="2" 
-                        Command="{Binding ToggleMuteCommand}"
-                        Width="60"
-                        MinHeight="60"
-                        VerticalAlignment="Top"
-                        Margin="0,0,10,0"
-                        ToolTip="Toggle AI Voice Response">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
-                            <Setter Property="Background" Value="#6B7280"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsMuted}" Value="True">
-                                    <Setter Property="Background" Value="#EF4444"/>
-                                    <Setter Property="Content">
-                                        <Setter.Value>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="🔇" FontSize="16" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Setter.Value>
-                                    </Setter>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                    <Button.Content>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="🔊" FontSize="16" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button.Content>
-                </Button>
-                
-                <Button Grid.Column="3" 
-                        Command="{Binding ToggleShowSourcesCommand}"
-                        Width="60"
-                        MinHeight="60"
-                        VerticalAlignment="Top"
-                        Margin="0,0,10,0"
-                        ToolTip="Show Sources - Toggle to show/hide document sources">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
-                            <Setter Property="Background" Value="#8B5CF6"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ShowSources}" Value="True">
-                                    <Setter Property="Background" Value="#7C3AED"/>
-                                    <Setter Property="Content">
-                                        <Setter.Value>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="📄" FontSize="16" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Setter.Value>
-                                    </Setter>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding ShowSources}" Value="False">
-                                    <Setter Property="Content">
-                                        <Setter.Value>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="📄" FontSize="16" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Setter.Value>
-                                    </Setter>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                
-                <Button Grid.Column="4" 
-                        Content="Send" 
-                        Command="{Binding AskCommand}"
-                        Style="{StaticResource ModernButton}"
-                        Width="100"
-                        MinHeight="60"
-                        VerticalAlignment="Top"/>
+                <!-- Control Buttons Row -->
+                <StackPanel Grid.Row="1" 
+                            Orientation="Horizontal" 
+                            HorizontalAlignment="Center" 
+                            Margin="0,10,0,0">
+                    
+                    <!-- Voice Recording Button -->
+                    <Button Command="{Binding VoiceAskCommand}"
+                            Width="60"
+                            Height="50"
+                            Margin="0,0,10,0"
+                            ToolTip="Voice Ask - Click to record your question">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                                <Setter Property="Background" Value="#10B981"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                        <Setter Property="Background" Value="#EF4444"/>
+                                        <Setter Property="Content">
+                                            <Setter.Value>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="⏹" FontSize="16" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsVoiceEnabled}" Value="False">
+                                        <Setter Property="Background" Value="#D1D5DB"/>
+                                        <Setter Property="IsEnabled" Value="False"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🎤" FontSize="16" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
+                    
+                    <!-- Mute/Unmute Button -->
+                    <Button Command="{Binding ToggleMuteCommand}"
+                            Width="60"
+                            Height="50"
+                            Margin="0,0,10,0"
+                            ToolTip="Toggle AI Voice Response">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                                <Setter Property="Background" Value="#6B7280"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                        <Setter Property="Background" Value="#EF4444"/>
+                                        <Setter Property="Content">
+                                            <Setter.Value>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="🔇" FontSize="16" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔊" FontSize="16" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
+                    
+                    <!-- Show Sources Button -->
+                    <Button Command="{Binding ToggleShowSourcesCommand}"
+                            Width="60"
+                            Height="50"
+                            Margin="0,0,10,0"
+                            ToolTip="Show Sources - Toggle to show/hide document sources">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                                <Setter Property="Background" Value="#8B5CF6"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowSources}" Value="True">
+                                        <Setter Property="Background" Value="#7C3AED"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📄" FontSize="16" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
+                    
+                    <!-- Toggle Conversation Context Button -->
+                    <Button Command="{Binding ToggleConversationContextCommand}"
+                            Width="60"
+                            Height="50"
+                            Margin="0,0,10,0"
+                            ToolTip="Toggle Conversation Context">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                                <Setter Property="Background" Value="#FF9800"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding EnableConversationContext}" Value="False">
+                                        <Setter Property="Background" Value="#9E9E9E"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🧠" FontSize="16" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
+                    
+                    <!-- Toggle Auto Suggestions Button -->
+                    <Button Command="{Binding ToggleAutoSuggestionsCommand}"
+                            Width="60"
+                            Height="50"
+                            ToolTip="Toggle Auto-Suggestions">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                                <Setter Property="Background" Value="#FF5722"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding EnableAutoSuggestions}" Value="False">
+                                        <Setter Property="Background" Value="#9E9E9E"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="💡" FontSize="16" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
+                </StackPanel>
             </Grid>
 
             <!-- Recording Level Indicator -->

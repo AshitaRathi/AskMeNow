@@ -14,6 +14,10 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly IQuestionHandler _questionHandler;
     private readonly ISpeechToTextService _speechToTextService;
     private readonly ITextToSpeechService _textToSpeechService;
+    private readonly IPersistentKnowledgeBaseService _knowledgeBaseService;
+    private readonly IFileWatcherService _fileWatcherService;
+    private readonly IConversationService _conversationService;
+    private readonly IAutoSuggestService _autoSuggestService;
     private string _userQuestion = string.Empty;
     private bool _isLoading = false;
     private string _statusMessage = "Welcome to AskMeNow! Please select a folder containing documents to begin.";
@@ -27,12 +31,26 @@ public class MainViewModel : INotifyPropertyChanged
     private CancellationTokenSource? _recordingCancellationTokenSource;
     private ObservableCollection<Message> _messages = new();
     private ObservableCollection<DocumentInfo> _loadedDocuments = new();
+    private string _currentConversationId = string.Empty;
+    private bool _enableConversationContext = true;
+    private bool _enableAutoSuggestions = true;
 
-    public MainViewModel(IQuestionHandler questionHandler, ISpeechToTextService speechToTextService, ITextToSpeechService textToSpeechService)
+    public MainViewModel(
+        IQuestionHandler questionHandler, 
+        ISpeechToTextService speechToTextService, 
+        ITextToSpeechService textToSpeechService,
+        IPersistentKnowledgeBaseService knowledgeBaseService,
+        IFileWatcherService fileWatcherService,
+        IConversationService conversationService,
+        IAutoSuggestService autoSuggestService)
     {
         _questionHandler = questionHandler;
         _speechToTextService = speechToTextService;
         _textToSpeechService = textToSpeechService;
+        _knowledgeBaseService = knowledgeBaseService;
+        _fileWatcherService = fileWatcherService;
+        _conversationService = conversationService;
+        _autoSuggestService = autoSuggestService;
         
         AskCommand = new RelayCommand(async () => await AskQuestionAsync(), () => !IsLoading && IsDocumentsLoaded && !string.IsNullOrWhiteSpace(UserQuestion));
         SelectFolderCommand = new RelayCommand(SelectFolder);
@@ -42,6 +60,9 @@ public class MainViewModel : INotifyPropertyChanged
         StopRecordingCommand = new RelayCommand(StopVoiceRecording, () => IsRecording);
         ToggleMuteCommand = new RelayCommand(ToggleMute);
         ToggleShowSourcesCommand = new RelayCommand(ToggleShowSources);
+        NewConversationCommand = new RelayCommand(async () => await StartNewConversationAsync());
+        ToggleConversationContextCommand = new RelayCommand(ToggleConversationContext);
+        ToggleAutoSuggestionsCommand = new RelayCommand(ToggleAutoSuggestions);
         
         // Subscribe to voice service events
         _speechToTextService.RecordingStarted += OnRecordingStarted;
@@ -50,12 +71,20 @@ public class MainViewModel : INotifyPropertyChanged
         _textToSpeechService.SpeechStarted += OnSpeechStarted;
         _textToSpeechService.SpeechCompleted += OnSpeechCompleted;
         _textToSpeechService.SpeechError += OnSpeechError;
-        
-        // Initialize voice services
-        _ = Task.Run(async () => await InitializeVoiceServicesAsync());
-        
-        // Add welcome message
+
+        // Subscribe to file watcher events
+        _fileWatcherService.FileAdded += OnFileAdded;
+        _fileWatcherService.FileChanged += OnFileChanged;
+        _fileWatcherService.FileDeleted += OnFileDeleted;
+
+        // Add welcome message first
         AddMessage("Welcome to AskMeNow! Loading your documents...", MessageSender.AI);
+        
+        // Initialize services
+        _ = Task.Run(async () => await InitializeServicesAsync());
+        
+        // Start a new conversation (this will clear messages and add a new welcome)
+        _ = Task.Run(async () => await StartNewConversationAsync());
     }
 
     public string UserQuestion
@@ -132,6 +161,9 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand StopRecordingCommand { get; }
     public ICommand ToggleMuteCommand { get; }
     public ICommand ToggleShowSourcesCommand { get; }
+    public ICommand NewConversationCommand { get; }
+    public ICommand ToggleConversationContextCommand { get; }
+    public ICommand ToggleAutoSuggestionsCommand { get; }
 
     public bool IsRecording
     {
@@ -186,6 +218,36 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    public string CurrentConversationId
+    {
+        get => _currentConversationId;
+        set
+        {
+            _currentConversationId = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool EnableConversationContext
+    {
+        get => _enableConversationContext;
+        set
+        {
+            _enableConversationContext = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool EnableAutoSuggestions
+    {
+        get => _enableAutoSuggestions;
+        set
+        {
+            _enableAutoSuggestions = value;
+            OnPropertyChanged();
+        }
+    }
+
     private async Task AskQuestionAsync()
     {
         if (string.IsNullOrWhiteSpace(UserQuestion))
@@ -211,13 +273,18 @@ public class MainViewModel : INotifyPropertyChanged
 
         try
         {
-            var answer = await _questionHandler.ProcessQuestionAsync(question);
+            // Use conversation context if enabled and conversation exists
+            var conversationId = EnableConversationContext && !string.IsNullOrEmpty(CurrentConversationId) 
+                ? CurrentConversationId 
+                : string.Empty;
+
+            var answer = await _questionHandler.ProcessQuestionAsync(question, conversationId);
             
             // Remove loading message
             Messages.Remove(loadingMessage);
             
-            // Add AI response
-            AddMessage(answer.Answer, MessageSender.AI, answer.DocumentSnippets);
+            // Add AI response with suggested questions
+            AddMessage(answer.Answer, MessageSender.AI, answer.DocumentSnippets, answer.SuggestedQuestions);
             
             // Speak the AI response if voice is enabled
             if (IsVoiceEnabled)
@@ -255,14 +322,15 @@ public class MainViewModel : INotifyPropertyChanged
         await AskQuestionAsync();
     }
 
-    private void AddMessage(string text, MessageSender sender, List<DocumentSnippet>? documentSnippets = null)
+    private void AddMessage(string text, MessageSender sender, List<DocumentSnippet>? documentSnippets = null, List<SuggestedQuestion>? suggestedQuestions = null)
     {
         var message = new Message
         {
             Text = text,
             Sender = sender,
             Timestamp = DateTime.Now,
-            DocumentSnippets = documentSnippets ?? new List<DocumentSnippet>()
+            DocumentSnippets = documentSnippets ?? new List<DocumentSnippet>(),
+            SuggestedQuestions = suggestedQuestions ?? new List<SuggestedQuestion>()
         };
         
         Messages.Add(message);
@@ -289,6 +357,9 @@ public class MainViewModel : INotifyPropertyChanged
             if (dialog.ShowDialog() == true)
             {
                 await LoadDocumentsAsync(dialog.FolderName);
+                
+                // Start watching the selected folder for changes
+                _fileWatcherService.StartWatching(dialog.FolderName);
             }
         }
         finally
@@ -457,18 +528,22 @@ public class MainViewModel : INotifyPropertyChanged
 
     #region Voice Interaction Methods
 
-    private async Task InitializeVoiceServicesAsync()
+    private async Task InitializeServicesAsync()
     {
         try
         {
+            // Initialize knowledge base
+            await _knowledgeBaseService.InitializeAsync();
+            
+            // Initialize voice services
             await _speechToTextService.InitializeAsync();
             // TTS service doesn't need explicit initialization
         }
         catch (Exception ex)
         {
-            // If voice services fail to initialize, disable voice features
+            // If services fail to initialize, disable voice features
             IsVoiceEnabled = false;
-            System.Diagnostics.Debug.WriteLine($"Voice services initialization failed: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Services initialization failed: {ex.Message}");
         }
     }
 
@@ -537,6 +612,107 @@ public class MainViewModel : INotifyPropertyChanged
     {
         ShowSources = !ShowSources;
     }
+
+    #region File Watcher Event Handlers
+
+    private async void OnFileAdded(object? sender, string filePath)
+    {
+        try
+        {
+            await _knowledgeBaseService.ProcessDocumentAsync(filePath);
+            System.Diagnostics.Debug.WriteLine($"Processed new file: {filePath}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error processing new file {filePath}: {ex.Message}");
+        }
+    }
+
+    private async void OnFileChanged(object? sender, string filePath)
+    {
+        try
+        {
+            await _knowledgeBaseService.UpdateDocumentAsync(filePath);
+            System.Diagnostics.Debug.WriteLine($"Updated file: {filePath}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error updating file {filePath}: {ex.Message}");
+        }
+    }
+
+    private async void OnFileDeleted(object? sender, string filePath)
+    {
+        try
+        {
+            await _knowledgeBaseService.DeleteDocumentAsync(filePath);
+            System.Diagnostics.Debug.WriteLine($"Deleted file: {filePath}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error deleting file {filePath}: {ex.Message}");
+        }
+    }
+
+    #endregion
+
+    #region Conversation Management Methods
+
+    private async Task StartNewConversationAsync()
+    {
+        try
+        {
+            CurrentConversationId = await _conversationService.CreateNewConversationAsync();
+            
+            // Only clear messages if this is not the initial startup
+            if (Messages.Count > 1) // More than just the welcome message
+            {
+                Messages.Clear();
+                AddMessage("New conversation started! How can I help you today?", MessageSender.AI);
+            }
+            else
+            {
+                // On initial startup, just update the welcome message
+                if (Messages.Count == 1 && Messages[0].Text.Contains("Welcome to AskMeNow"))
+                {
+                    Messages[0].Text = "Welcome to AskMeNow! How can I help you today?";
+                }
+            }
+            
+            StatusMessage = "New conversation started.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to start new conversation: {ex.Message}";
+        }
+    }
+
+    private void ToggleConversationContext()
+    {
+        EnableConversationContext = !EnableConversationContext;
+        StatusMessage = EnableConversationContext 
+            ? "Conversation context enabled - AI will remember previous exchanges" 
+            : "Conversation context disabled - each question is treated independently";
+    }
+
+    private void ToggleAutoSuggestions()
+    {
+        EnableAutoSuggestions = !EnableAutoSuggestions;
+        StatusMessage = EnableAutoSuggestions 
+            ? "Auto-suggestions enabled - follow-up questions will be suggested" 
+            : "Auto-suggestions disabled";
+    }
+
+    public async Task HandleSuggestedQuestionClickAsync(string suggestedQuestion)
+    {
+        if (string.IsNullOrWhiteSpace(suggestedQuestion))
+            return;
+
+        UserQuestion = suggestedQuestion;
+        await AskQuestionAsync();
+    }
+
+    #endregion
 
     private async Task SpeakResponseAsync(string text)
     {

@@ -8,6 +8,7 @@ namespace AskMeNow.Application.Handlers;
 public interface IQuestionHandler
 {
     Task<FAQAnswer> ProcessQuestionAsync(string question);
+    Task<FAQAnswer> ProcessQuestionAsync(string question, string conversationId);
     Task<List<FAQDocument>> InitializeDocumentsAsync(string folderPath);
     FileProcessingResult? GetLastProcessingResult();
 }
@@ -50,6 +51,36 @@ public class QuestionHandler : IQuestionHandler
         }
         
         return await _faqService.AnswerQuestionAsync(sanitizedQuestion);
+    }
+
+    public async Task<FAQAnswer> ProcessQuestionAsync(string question, string conversationId)
+    {
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            return new FAQAnswer
+            {
+                Question = question,
+                Answer = "Please enter a valid question.",
+                Source = "System"
+            };
+        }
+
+        // Sanitize the question
+        var sanitizedQuestion = question.Trim();
+        
+        // Check if the question is a greeting or small talk
+        if (IsGreetingOrSmallTalk(sanitizedQuestion))
+        {
+            return new FAQAnswer
+            {
+                Question = sanitizedQuestion,
+                Answer = GetGreetingResponse(sanitizedQuestion),
+                Source = "AI Assistant"
+            };
+        }
+        
+        // Process as a normal document-based question with optional conversation context
+        return await _faqService.AnswerQuestionAsync(sanitizedQuestion, conversationId);
     }
 
     public async Task<List<FAQDocument>> InitializeDocumentsAsync(string folderPath)
