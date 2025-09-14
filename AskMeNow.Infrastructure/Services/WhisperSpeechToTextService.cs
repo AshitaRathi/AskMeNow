@@ -35,9 +35,12 @@ public class WhisperSpeechToTextService : ISpeechToTextService, IDisposable
                 try
                 {
                     _whisperFactory = WhisperFactory.FromPath(_modelPath);
+                    //_whisperProcessor = _whisperFactory.CreateBuilder()
+                    //    .WithLanguage("en")
+                    //    .Build();
                     _whisperProcessor = _whisperFactory.CreateBuilder()
-                        .WithLanguage("en")
                         .Build();
+
                     _useWhisper = true;
                     System.Diagnostics.Debug.WriteLine("Whisper model loaded successfully.");
                 }

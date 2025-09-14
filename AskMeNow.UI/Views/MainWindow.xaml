@@ -259,6 +259,72 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
+                        
+                        <!-- Document Sources Section -->
+                        <StackPanel Margin="0,8,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsLoading}" Value="False"/>
+                                                <Condition Binding="{Binding DataContext.ShowSources, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            
+                            <!-- Sources Header -->
+                            <TextBlock Text="📄 Sources:" 
+                                       FontSize="12" 
+                                       FontWeight="SemiBold" 
+                                       Foreground="#6B7280" 
+                                       Margin="0,0,0,4"/>
+                            
+                            <!-- Document Snippets -->
+                            <ItemsControl ItemsSource="{Binding DocumentSnippets}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#F8FAFC" 
+                                                BorderBrush="#E2E8F0" 
+                                                BorderThickness="1" 
+                                                CornerRadius="6" 
+                                                Padding="8" 
+                                                Margin="0,0,0,4">
+                                            <StackPanel>
+                                                <!-- File Name -->
+                                                <TextBlock Text="{Binding FileName}" 
+                                                           FontSize="11" 
+                                                           FontWeight="SemiBold" 
+                                                           Foreground="#4F8CFF" 
+                                                           Margin="0,0,0,2"/>
+                                                
+                                                <!-- Snippet Text with Highlighting -->
+                                                <TextBlock Text="{Binding SnippetText}" 
+                                                           FontSize="11" 
+                                                           Foreground="#374151" 
+                                                           TextWrapping="Wrap" 
+                                                           LineHeight="16">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="{Binding SnippetText}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HighlightedSentences.Count}" Value="0">
+                                                                    <Setter Property="Text" Value="{Binding SnippetText}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -473,6 +539,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
                 <TextBox Grid.Column="0" 
@@ -560,6 +627,41 @@
                 </Button>
                 
                 <Button Grid.Column="3" 
+                        Command="{Binding ToggleShowSourcesCommand}"
+                        Width="60"
+                        MinHeight="60"
+                        VerticalAlignment="Top"
+                        Margin="0,0,10,0"
+                        ToolTip="Show Sources - Toggle to show/hide document sources">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ModernButton}">
+                            <Setter Property="Background" Value="#8B5CF6"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ShowSources}" Value="True">
+                                    <Setter Property="Background" Value="#7C3AED"/>
+                                    <Setter Property="Content">
+                                        <Setter.Value>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="📄" FontSize="16" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Setter.Value>
+                                    </Setter>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ShowSources}" Value="False">
+                                    <Setter Property="Content">
+                                        <Setter.Value>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="📄" FontSize="16" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Setter.Value>
+                                    </Setter>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                
+                <Button Grid.Column="4" 
                         Content="Send" 
                         Command="{Binding AskCommand}"
                         Style="{StaticResource ModernButton}"

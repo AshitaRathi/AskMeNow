@@ -7,4 +7,5 @@ public class FAQAnswer
     public string Source { get; set; } = string.Empty;
     public DateTime AnsweredAt { get; set; } = DateTime.UtcNow;
     public List<string> SourceDocuments { get; set; } = new();
+    public List<DocumentSnippet> DocumentSnippets { get; set; } = new();
 }

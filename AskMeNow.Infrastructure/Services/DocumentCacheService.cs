@@ -86,6 +86,14 @@ public class DocumentCacheService : IDocumentCacheService
         return GetCachedContent();
     }
 
+    public List<FAQDocument> GetCachedDocuments()
+    {
+        if (string.IsNullOrEmpty(_currentFolderPath))
+            return new List<FAQDocument>();
+
+        return _documentCache.TryGetValue(_currentFolderPath, out var documents) ? documents : new List<FAQDocument>();
+    }
+
     public FileProcessingResult? GetLastProcessingResult()
     {
         if (string.IsNullOrEmpty(_currentFolderPath))

@@ -22,6 +22,7 @@ public class MainViewModel : INotifyPropertyChanged
     private bool _isRecording = false;
     private bool _isVoiceEnabled = true;
     private bool _isMuted = false;
+    private bool _showSources = false;
     private float _recordingLevel = 0f;
     private CancellationTokenSource? _recordingCancellationTokenSource;
     private ObservableCollection<Message> _messages = new();
@@ -40,6 +41,7 @@ public class MainViewModel : INotifyPropertyChanged
         VoiceAskCommand = new RelayCommand(async () => await StartVoiceRecordingAsync(), () => !IsLoading && IsDocumentsLoaded && IsVoiceEnabled && !IsRecording);
         StopRecordingCommand = new RelayCommand(StopVoiceRecording, () => IsRecording);
         ToggleMuteCommand = new RelayCommand(ToggleMute);
+        ToggleShowSourcesCommand = new RelayCommand(ToggleShowSources);
         
         // Subscribe to voice service events
         _speechToTextService.RecordingStarted += OnRecordingStarted;
@@ -129,6 +131,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand VoiceAskCommand { get; }
     public ICommand StopRecordingCommand { get; }
     public ICommand ToggleMuteCommand { get; }
+    public ICommand ToggleShowSourcesCommand { get; }
 
     public bool IsRecording
     {
@@ -173,6 +176,16 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool ShowSources
+    {
+        get => _showSources;
+        set
+        {
+            _showSources = value;
+            OnPropertyChanged();
+        }
+    }
+
     private async Task AskQuestionAsync()
     {
         if (string.IsNullOrWhiteSpace(UserQuestion))
@@ -204,7 +217,7 @@ public class MainViewModel : INotifyPropertyChanged
             Messages.Remove(loadingMessage);
             
             // Add AI response
-            AddMessage(answer.Answer, MessageSender.AI);
+            AddMessage(answer.Answer, MessageSender.AI, answer.DocumentSnippets);
             
             // Speak the AI response if voice is enabled
             if (IsVoiceEnabled)
@@ -242,13 +255,14 @@ public class MainViewModel : INotifyPropertyChanged
         await AskQuestionAsync();
     }
 
-    private void AddMessage(string text, MessageSender sender)
+    private void AddMessage(string text, MessageSender sender, List<DocumentSnippet>? documentSnippets = null)
     {
         var message = new Message
         {
             Text = text,
             Sender = sender,
-            Timestamp = DateTime.Now
+            Timestamp = DateTime.Now,
+            DocumentSnippets = documentSnippets ?? new List<DocumentSnippet>()
         };
         
         Messages.Add(message);
@@ -517,6 +531,11 @@ public class MainViewModel : INotifyPropertyChanged
         {
             _textToSpeechService.StopSpeaking();
         }
+    }
+
+    private void ToggleShowSources()
+    {
+        ShowSources = !ShowSources;
     }
 
     private async Task SpeakResponseAsync(string text)

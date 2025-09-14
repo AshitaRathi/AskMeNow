@@ -1,22 +1,8 @@
 using AskMeNow.Core.Entities;
+using AskMeNow.Core.Interfaces;
 using System.Text;
 
 namespace AskMeNow.Infrastructure.Services;
-
-public interface IDocumentChunkingService
-{
-    List<DocumentChunk> ChunkDocuments(List<FAQDocument> documents);
-    List<DocumentChunk> FindRelevantChunks(string question, List<DocumentChunk> chunks, int maxChunks = 5);
-}
-
-public class DocumentChunk
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Content { get; set; } = string.Empty;
-    public string SourceDocument { get; set; } = string.Empty;
-    public int ChunkIndex { get; set; }
-    public double RelevanceScore { get; set; }
-}
 
 public class DocumentChunkingService : IDocumentChunkingService
 {
@@ -130,5 +116,103 @@ public class DocumentChunkingService : IDocumentChunkingService
         var lengthPenalty = Math.Min(1.0, chunkWords.Count / 50.0); // Prefer chunks with reasonable length
         
         return baseScore * lengthPenalty;
+    }
+
+    public List<DocumentSnippet> GetRelevantSnippets(string question, List<FAQDocument> documents, int maxSnippets = 5)
+    {
+        if (string.IsNullOrWhiteSpace(question) || !documents.Any())
+            return new List<DocumentSnippet>();
+
+        var questionWords = ExtractKeywords(question.ToLower());
+        var snippets = new List<DocumentSnippet>();
+
+        foreach (var document in documents)
+        {
+            var documentSnippets = ExtractRelevantSnippetsFromDocument(question, questionWords, document);
+            snippets.AddRange(documentSnippets);
+        }
+
+        return snippets
+            .OrderByDescending(s => s.RelevanceScore)
+            .Take(maxSnippets)
+            .Where(s => s.RelevanceScore > 0)
+            .ToList();
+    }
+
+    private List<DocumentSnippet> ExtractRelevantSnippetsFromDocument(string question, List<string> questionWords, FAQDocument document)
+    {
+        var snippets = new List<DocumentSnippet>();
+        var content = document.Content;
+        var sentences = SplitIntoSentences(content);
+
+        for (int i = 0; i < sentences.Count; i++)
+        {
+            var sentence = sentences[i];
+            var score = CalculateRelevanceScore(questionWords, sentence.ToLower());
+            
+            if (score > 0)
+            {
+                // Create a snippet with context (previous + current + next sentence)
+                var startIndex = Math.Max(0, i - 1);
+                var endIndex = Math.Min(sentences.Count - 1, i + 1);
+                
+                var snippetText = string.Join(" ", sentences.Skip(startIndex).Take(endIndex - startIndex + 1));
+                var highlightedSentences = new List<string> { sentence };
+
+                // Find the position in the original document
+                var sentenceStart = content.IndexOf(sentence);
+                var snippetStart = content.IndexOf(snippetText);
+
+                snippets.Add(new DocumentSnippet
+                {
+                    FileName = Path.GetFileName(document.FilePath),
+                    SnippetText = snippetText,
+                    StartIndex = snippetStart >= 0 ? snippetStart : 0,
+                    EndIndex = snippetStart >= 0 ? snippetStart + snippetText.Length : snippetText.Length,
+                    RelevanceScore = score,
+                    HighlightedSentences = highlightedSentences,
+                    FilePath = document.FilePath
+                });
+            }
+        }
+
+        return snippets;
+    }
+
+    private List<string> SplitIntoSentences(string text)
+    {
+        // Simple sentence splitting - can be enhanced with more sophisticated NLP
+        var sentences = new List<string>();
+        var currentSentence = new StringBuilder();
+        
+        for (int i = 0; i < text.Length; i++)
+        {
+            var currentChar = text[i];
+            currentSentence.Append(currentChar);
+            
+            // Check for sentence endings
+            if (currentChar == '.' || currentChar == '!' || currentChar == '?')
+            {
+                // Look ahead to see if it's really the end of a sentence
+                if (i + 1 >= text.Length || char.IsWhiteSpace(text[i + 1]) || text[i + 1] == '\n')
+                {
+                    var sentence = currentSentence.ToString().Trim();
+                    if (!string.IsNullOrWhiteSpace(sentence))
+                    {
+                        sentences.Add(sentence);
+                    }
+                    currentSentence.Clear();
+                }
+            }
+        }
+        
+        // Add the last sentence if there's any remaining text
+        var lastSentence = currentSentence.ToString().Trim();
+        if (!string.IsNullOrWhiteSpace(lastSentence))
+        {
+            sentences.Add(lastSentence);
+        }
+        
+        return sentences;
     }
 }

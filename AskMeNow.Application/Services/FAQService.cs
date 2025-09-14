@@ -13,11 +13,13 @@ public class FAQService : IFAQService
 {
     private readonly IDocumentCacheService _documentCacheService;
     private readonly IBedrockClientService _bedrockClientService;
+    private readonly IDocumentChunkingService _chunkingService;
 
-    public FAQService(IDocumentCacheService documentCacheService, IBedrockClientService bedrockClientService)
+    public FAQService(IDocumentCacheService documentCacheService, IBedrockClientService bedrockClientService, IDocumentChunkingService chunkingService)
     {
         _documentCacheService = documentCacheService;
         _bedrockClientService = bedrockClientService;
+        _chunkingService = chunkingService;
     }
 
     public async Task<List<FAQDocument>> LoadDocumentsAsync(string folderPath)
@@ -39,6 +41,10 @@ public class FAQService : IFAQService
             };
         }
 
+        // Get document snippets for source references
+        var documents = _documentCacheService.GetCachedDocuments();
+        var documentSnippets = _chunkingService.GetRelevantSnippets(question, documents, 5);
+
         var answer = await _bedrockClientService.GenerateAnswerAsync(question, context);
 
         return new FAQAnswer
@@ -46,7 +52,8 @@ public class FAQService : IFAQService
             Question = question,
             Answer = answer,
             Source = "AI Assistant",
-            SourceDocuments = new List<string> { "Knowledge Base" }
+            SourceDocuments = new List<string> { "Knowledge Base" },
+            DocumentSnippets = documentSnippets
         };
     }
 }
