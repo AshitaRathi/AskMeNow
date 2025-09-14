@@ -460,7 +460,7 @@
                 </ScrollViewer>
             </Border>
 
-            <!-- Input Area -->
+            <!-- Input Area - Auto-resizing TextBox with MinHeight 60px, MaxHeight 200px -->
             <Grid Grid.Row="2" Margin="0,0,0,20">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -473,7 +473,9 @@
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Auto"
-                         Height="60"
+                         MinHeight="60"
+                         MaxHeight="200"
+                         VerticalAlignment="Top"
                          FontSize="14"
                          Margin="0,0,10,0">
                     <TextBox.InputBindings>
@@ -486,7 +488,8 @@
                         Command="{Binding AskCommand}"
                         Style="{StaticResource ModernButton}"
                         Width="100"
-                        Height="60"/>
+                        MinHeight="60"
+                        VerticalAlignment="Top"/>
             </Grid>
 
             <!-- Export Button -->
