@@ -24,9 +24,12 @@ public class KnowledgeBaseContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.FilePath).IsUnique();
             entity.HasIndex(e => e.LastModified);
+            entity.HasIndex(e => e.FileType);
             entity.Property(e => e.FilePath).IsRequired().HasMaxLength(500);
             entity.Property(e => e.FileName).IsRequired().HasMaxLength(255);
             entity.Property(e => e.Language).HasMaxLength(10).HasDefaultValue("en");
+            entity.Property(e => e.FileType).IsRequired().HasMaxLength(10);
+            entity.Property(e => e.FileSizeBytes).HasDefaultValue(0);
         });
 
         // Configure EmbeddingEntity

@@ -22,6 +22,11 @@ public class DocumentEntity
     [MaxLength(10)]
     public string Language { get; set; } = "en";
     
+    [MaxLength(10)]
+    public string FileType { get; set; } = string.Empty;
+    
+    public long FileSizeBytes { get; set; }
+    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

@@ -16,9 +16,11 @@ public static class DependencyInjection
         // Configuration
         services.Configure<AwsConfig>(configuration.GetSection("AwsConfig"));
 
-        // Database
+        // Database - Use Infrastructure bin folder for organized location
+        var infrastructureBinPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "AskMeNow.Infrastructure", "bin", "Debug", "net8.0");
+        var dbPath = Path.Combine(infrastructureBinPath, "knowledgebase.db");
         services.AddDbContext<KnowledgeBaseContext>(options =>
-            options.UseSqlite("Data Source=knowledgebase.db"));
+            options.UseSqlite($"Data Source={dbPath}"));
 
         // Services
         services.AddScoped<IBedrockClientService, BedrockClientService>();

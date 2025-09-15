@@ -8,15 +8,17 @@ public class DocumentPreviewService : IDocumentPreviewService
 {
     private readonly IDocumentRepository _documentRepository;
     private readonly IBedrockClientService _bedrockService;
+    private readonly IDocumentParserService _documentParserService;
     private readonly Dictionary<string, List<DocumentHighlight>> _highlightsCache = new();
     private readonly Dictionary<string, int> _referenceCounts = new();
     private readonly Dictionary<string, string> _documentContentCache = new();
     private readonly Dictionary<string, string> _summaryCache = new();
 
-    public DocumentPreviewService(IDocumentRepository documentRepository, IBedrockClientService bedrockService)
+    public DocumentPreviewService(IDocumentRepository documentRepository, IBedrockClientService bedrockService, IDocumentParserService documentParserService)
     {
         _documentRepository = documentRepository;
         _bedrockService = bedrockService;
+        _documentParserService = documentParserService;
     }
 
     public async Task<DocumentPreview?> GetDocumentPreviewAsync(string filePath)
@@ -26,8 +28,11 @@ public class DocumentPreviewService : IDocumentPreviewService
             if (!File.Exists(filePath))
                 return null;
 
+            // Add timeout to prevent freezing
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            
             var content = await GetDocumentContentAsync(filePath);
-            if (string.IsNullOrEmpty(content))
+            if (string.IsNullOrEmpty(content) || content == "Unable to extract content from this file type.")
                 return null;
 
             var summary = await GenerateSummaryAsync(filePath, content);
@@ -50,6 +55,11 @@ public class DocumentPreviewService : IDocumentPreviewService
                 Highlights = highlights,
                 ReferencedSnippets = referencedSnippets
             };
+        }
+        catch (OperationCanceledException)
+        {
+            // Timeout occurred - return null to prevent freezing
+            return null;
         }
         catch (Exception)
         {
@@ -136,13 +146,33 @@ public class DocumentPreviewService : IDocumentPreviewService
 
         try
         {
-            var content = await File.ReadAllTextAsync(filePath);
+            // Use the document parser service to handle all file types with timeout
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var document = await _documentParserService.ParseDocumentAsync(filePath);
+            var content = document?.Content ?? "No content extracted";
+            
             _documentContentCache[filePath] = content;
             return content;
         }
         catch (Exception)
         {
-            return string.Empty;
+            // Fallback to direct file reading for text files only
+            try
+            {
+                var extension = Path.GetExtension(filePath).ToLowerInvariant();
+                if (extension == ".txt" || extension == ".md")
+                {
+                    var content = await File.ReadAllTextAsync(filePath);
+                    _documentContentCache[filePath] = content;
+                    return content;
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore fallback errors
+            }
+            
+            return "Unable to extract content from this file type.";
         }
     }
 

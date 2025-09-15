@@ -47,9 +47,17 @@ public class PersistentKnowledgeBaseService : IPersistentKnowledgeBaseService, I
         }
 
         // Parse document content
-        var document = await _documentParserService.ParseDocumentAsync(filePath);
-        if (document == null || string.IsNullOrWhiteSpace(document.Content))
-            return;
+        string content;
+        try
+        {
+            var document = await _documentParserService.ParseDocumentAsync(filePath);
+            content = document?.Content ?? "No content extracted";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to parse document {filePath}: {ex.Message}");
+            content = "No content extracted - parsing failed";
+        }
 
         // Remove existing embeddings if document exists
         if (existingDocument != null)
@@ -64,14 +72,16 @@ public class PersistentKnowledgeBaseService : IPersistentKnowledgeBaseService, I
             FilePath = filePath,
             FileName = Path.GetFileName(filePath),
             LastModified = fileInfo.LastWriteTime,
-            Language = "en"
+            Language = "en",
+            FileType = Path.GetExtension(filePath).ToLowerInvariant(),
+            FileSizeBytes = fileInfo.Length
         };
 
         _context.Documents.Add(documentEntity);
         await _context.SaveChangesAsync();
 
         // Split document into chunks and generate embeddings
-        var chunks = SplitIntoChunks(document.Content, 500); // 500 character chunks
+        var chunks = SplitIntoChunks(content, 500); // 500 character chunks
         var embeddings = new List<EmbeddingEntity>();
 
         for (int i = 0; i < chunks.Count; i++)
@@ -101,9 +111,17 @@ public class PersistentKnowledgeBaseService : IPersistentKnowledgeBaseService, I
         if (!Directory.Exists(folderPath))
             return;
 
-        var txtFiles = Directory.GetFiles(folderPath, "*.txt", SearchOption.AllDirectories);
+        // Clear all existing documents and embeddings when processing a new folder
+        await ClearAllDocumentsAsync();
+
+        // Get all supported file types
+        var supportedExtensions = _documentParserService.GetSupportedExtensions();
+        var allFiles = Directory.GetFiles(folderPath, "*.*", SearchOption.AllDirectories);
+        var supportedFiles = allFiles
+            .Where(file => supportedExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
+            .ToList();
         
-        foreach (var file in txtFiles)
+        foreach (var file in supportedFiles)
         {
             try
             {
@@ -266,6 +284,19 @@ public class PersistentKnowledgeBaseService : IPersistentKnowledgeBaseService, I
         var array = new float[dimensions];
         Buffer.BlockCopy(bytes, 0, array, 0, bytes.Length);
         return array;
+    }
+
+    private async Task ClearAllDocumentsAsync()
+    {
+        // Remove all embeddings first (due to foreign key constraints)
+        var allEmbeddings = await _context.Embeddings.ToListAsync();
+        _context.Embeddings.RemoveRange(allEmbeddings);
+        
+        // Remove all documents
+        var allDocuments = await _context.Documents.ToListAsync();
+        _context.Documents.RemoveRange(allDocuments);
+        
+        await _context.SaveChangesAsync();
     }
 
     public void Dispose()
