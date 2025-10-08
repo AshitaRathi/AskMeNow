@@ -132,10 +132,17 @@ dotnet run --project src/AskMeNow.UI
 
 ## Screenshots
 
-<img width="1918" height="1135" alt="Chat with AI Assistant   Loaded Documents" src="https://github.com/user-attachments/assets/8039d909-b3ab-43d0-9387-4d360df40cae" />
-<img width="1918" height="1135" alt="Document Preview Feature" src="https://github.com/user-attachments/assets/6d7ff736-5b96-47fa-9957-26cea8f3f13d" />
-<img width="1917" height="1131" alt="Show Resource of Answer Feature" src="https://github.com/user-attachments/assets/aed9998f-d0c4-45b0-8939-d8e3875e9634" />
-<img width="1913" height="1138" alt="Suggested Questions   Chat Export Feature" src="https://github.com/user-attachments/assets/37f25e27-a759-4f30-bbec-faf330fac54d" />
+### 1. Chat with AI Assistant & Loaded Documents
+<img src="https://github.com/user-attachments/assets/8039d909-b3ab-43d0-9387-4d360df40cae" alt="Chat with AI Assistant Loaded Documents" width="900" />
+
+### 2. Document Preview Feature
+<img src="https://github.com/user-attachments/assets/6d7ff736-5b96-47fa-9957-26cea8f3f13d" alt="Document Preview Feature" width="900" />
+
+### 3. Show Resource of Answer Feature
+<img src="https://github.com/user-attachments/assets/aed9998f-d0c4-45b0-8939-d8e3875e9634" alt="Show Resource of Answer Feature" width="900" />
+
+### 4. Suggested Questions & Chat Export Feature
+<img src="https://github.com/user-attachments/assets/37f25e27-a759-4f30-bbec-faf330fac54d" alt="Suggested Questions and Chat Export Feature" width="900" />
 
 ---
 
