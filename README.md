@@ -1,7 +1,7 @@
 ## Project Title & Tagline
 
 - **AskMeNow**
-- A friendly desktop app that lets you chat with your documents and FAQs. 🎙️🤖
+- A friendly desktop app that lets you chat with your documents in Q/A form. 🎙️🤖
 
 ## About
 
@@ -10,8 +10,8 @@ AskMeNow is a Windows desktop app that turns your files and knowledge base into 
 ## Overview / Problem Statement
 
 - The problem: Finding information buried inside documents, wikis, and folders is slow and frustrating.
-- Who benefits: Individuals and teams who work with PDFs, docs, knowledge bases, FAQs, or research materials.
-- What makes it unique: It combines local document parsing, smart retrieval, and AI chat in one simple WPF app — with a clean architecture, optional offline capabilities, and pluggable services.
+- Who benefits: Individuals and teams who work with PDFs, docs, knowledge bases, or research materials.
+- What makes it unique: It combines local document parsing, smart retrieval, and AI chat in one simple WPF app — with a clean architecture.
 
 ## Key Features
 
@@ -27,7 +27,7 @@ AskMeNow is a Windows desktop app that turns your files and knowledge base into 
 - .NET 8, WPF (Windows)
 - EF Core, SQLite (local storage)
 - AWS Bedrock Claude (LLM)
-- Optional: Whisper (speech‑to‑text), simple TTS engine
+- Whisper (speech‑to‑text)
 
 | Area | Technology |
 | --- | --- |
@@ -36,7 +36,7 @@ AskMeNow is a Windows desktop app that turns your files and knowledge base into 
 | AI / LLM | AWS Bedrock Claude |
 | Data Access | Entity Framework Core |
 | Database | SQLite (local) |
-| Speech | Whisper STT, Simple TTS |
+| Speech | Whisper.NET |
 
 ## Architecture / Project Structure
 
@@ -47,7 +47,7 @@ The app follows a clean, layered structure so each part has a single, clear purp
 - Infrastructure (`AskMeNow.Infrastructure`): The concrete implementations — data access (EF Core/SQLite), external services (AWS Bedrock, Whisper), repositories, and configuration.
 - Application (`AskMeNow.Application`): Application‑level coordinators (handlers/services) that orchestrate workflows using Core interfaces.
 
-Optional diagram to visualize the layers:
+Diagram to visualize the layers:
 
 ```
 ┌───────────────────────────┐
@@ -80,8 +80,8 @@ Prerequisites:
 
 - Windows 10/11
 - .NET 8 SDK
-- (Optional) AWS account and Bedrock access if you want AI responses
-- (Optional) Microphone for speech features
+- AWS Bedrock access if you want AI responses
+- Microphone for speech features
 
 Step‑by‑step:
 
@@ -104,7 +104,6 @@ dotnet restore
 - Provide AWS credentials via one of the standard methods:
   - Environment variables: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
   - AWS CLI/Shared credentials file
-  - IAM role (if running on an AWS host)
 - Database: SQLite is local and works out of the box (no extra setup needed).
 
 4) Run the app
@@ -120,7 +119,7 @@ Alternatively, open the solution `AskMeNow.sln` in Visual Studio, set `AskMeNow.
 After launching the app:
 
 1) Add your documents (PDFs, text, notes).
-2) Click “Ask” and type a question in plain English.
+2) Type a question in plain English.
 3) The app finds the most relevant snippets and answers clearly with sources.
 4) Explore suggested follow‑up questions or ask your own.
 5) Optionally use speech‑to‑text to dictate questions, and text‑to‑speech to listen to answers.
@@ -146,22 +145,10 @@ Watch a quick walkthrough:
 - Placeholder path: `/docs/videos/demo.mp4`
 - Or add an online link: `https://your-demo-link.example.com`
 
-## Diagrams
-
-Diagrams are stored in `/docs/diagrams` (Mermaid `.mmd` files). Categories:
-
-- Class Diagram
-- Flow Diagram
-- Sequence Diagram
-- Architecture Diagram
-
-> You can view Mermaid diagrams directly in many editors or render them in docs.
-
 ## Roadmap / Future Enhancements
 
 - Add support for audio files (.mp3, .wav, etc.)
 - Add cloud storage integration (Google Drive, OneDrive, S3)
-- Enable multi‑user collaboration
 - Add advanced semantic search and embeddings
 - Build a web‑based version with the same functionality
 
@@ -174,7 +161,6 @@ We care about safety, reliability, and maintainability:
 - Async operations: Uses asynchronous calls to keep the UI responsive and fast.
 - SOLID principles & Clean Architecture: Clear boundaries between UI, Core, Infrastructure, and Application.
 - Repository pattern: Predictable and testable data access.
-- Secrets management: Use environment variables or secure stores for API keys (never commit secrets).
 
 ---
 
