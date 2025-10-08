@@ -1,44 +1,61 @@
-## Project Title & Tagline
+# 🧠 AskMeNow – AI-Powered Document Intelligence Platform  
+*(.NET 8 · WPF · AWS Bedrock Claude 3 Sonnet · EF Core · SQLite)*
 
-- **AskMeNow**
-- A friendly desktop app that lets you chat with your documents in Q/A form. 🎙️🤖
+---
 
-## About
+## 🌟 Overview
 
-AskMeNow is a Windows desktop app that turns your files and knowledge base into a helpful, conversational assistant. It was created to remove the friction of digging through folders, PDFs, and notes just to find a simple answer. The inspiration came from real-world teams who spend too much time searching instead of doing — AskMeNow brings the answers to you in plain language.
+**AskMeNow** is an **AI-powered knowledge base** that transforms static documents into **interactive Q&A experiences**.  
+It allows us to upload multiple document formats, ask questions in natural language, and receive accurate, contextual answers — all within an intuitive WPF interface.
 
-## Overview / Problem Statement
+Whether you're analyzing reports, research papers, or project documentation, AskMeNow makes it effortless to extract insights instantly.
 
 - The problem: Finding information buried inside documents, wikis, and folders is slow and frustrating.
 - Who benefits: Individuals and teams who work with PDFs, docs, knowledge bases, or research materials.
 - What makes it unique: It combines local document parsing, smart retrieval, and AI chat in one simple WPF app — with a clean architecture.
 
-## Key Features
+---
 
-- Smart Q&A: Ask questions in plain English and get concise, sourced answers.
-- Document-aware chat: Upload files and chat with their contents as if they were a teammate.
-- Suggested questions: Get helpful follow‑ups to keep your research moving.
-- Fast search: Pulls relevant snippets instead of dumping entire documents at you.
-- Sentiment insights: Understand tone and intent in conversations when needed.
-- Speech support: Optional speech‑to‑text and text‑to‑speech to talk hands‑free.
+## 🚀 Problem It Solves
+Manually reading and searching long documents is slow, inefficient, and often frustrating.  
+AskMeNow automates that process by:
 
-## Tech Stack
+- Extracting readable content and metadata from multiple document types.
+- Using semantic embeddings and multi-query retrieval for precise understanding.
+- Providing **AI-generated answers** using **AWS Bedrock Claude 3 Sonnet**.
+- Maintaining context and citations for transparent, trustworthy results.
 
-- .NET 8, WPF (Windows)
-- EF Core, SQLite (local storage)
-- AWS Bedrock Claude (LLM)
-- Whisper (speech‑to‑text)
+---
 
-| Area | Technology |
-| --- | --- |
-| Language & Runtime | .NET 8 (C#) |
-| UI | WPF |
-| AI / LLM | AWS Bedrock Claude |
-| Data Access | Entity Framework Core |
-| Database | SQLite (local) |
-| Speech | Whisper.NET |
+## 💡 Key Features
 
-## Architecture / Project Structure
+✅ **Smart Q&A** – Ask questions in plain English and get concise, sourced answers.
+✅ **Document-aware chat** – Handles `.pdf`, `.docx`, `.xlsx`, `.txt`, `.md`, `.json`, `.html`, and `.htm`. Upload files and chat with their contents as if they were a teammate.
+✅ **Suggested questions** – Get helpful follow‑ups to keep your research moving.
+✅ **Fast search** – - Fast search: Pulls relevant snippets instead of dumping entire documents at you.
+✅ **Real-Time Preview** – Instantly preview documents in the side panel.  
+✅ **Sentiment insights** – Understand tone and intent in conversations when needed.
+✅ **Speech support** – Speech‑to‑text and text‑to‑speech to talk hands‑free.  
+✅ **Conversational Memory** – Keeps context across related questions.  
+✅ **Smart Retrieval Pipeline** – Embeddings, chunking, and multi-query expansion for relevance.  
+✅ **Export Q&A Sessions** – Save, review, and share your question-answer sessions.  
+✅ **Clean Architecture + MVVM** – Ensures modularity, scalability, and testability.
+
+---
+
+## 🏗️ Tech Stack
+
+| Layer | Technology |
+|-------|-------------|
+| **Frontend** | WPF (.NET 8, MVVM) |
+| **Backend** | C# (.NET 8), EF Core, SQLite |
+| **AI / NLP** | AWS Bedrock Claude 3 Sonnet |
+| **Data Handling** | Embeddings, Chunking, Semantic Search |
+| **Architecture** | Clean Architecture, SOLID, Repository Pattern |
+
+---
+
+## 🧩 Architecture / Project Structure
 
 The app follows a clean, layered structure so each part has a single, clear purpose.
 
@@ -47,7 +64,6 @@ The app follows a clean, layered structure so each part has a single, clear purp
 - Infrastructure (`AskMeNow.Infrastructure`): The concrete implementations — data access (EF Core/SQLite), external services (AWS Bedrock, Whisper), repositories, and configuration.
 - Application (`AskMeNow.Application`): Application‑level coordinators (handlers/services) that orchestrate workflows using Core interfaces.
 
-Diagram to visualize the layers:
 
 ```
 ┌───────────────────────────┐
@@ -74,59 +90,44 @@ Project folders of interest:
 - `AskMeNow.Infrastructure`: EF Core `KnowledgeBaseContext`, repositories, AWS Bedrock client, speech services, and DI setup.
 - `AskMeNow.Application`: High‑level handlers (e.g., `QuestionHandler`) and services that wire the flow together.
 
-## Setup & Installation
 
-Prerequisites:
+---
 
-- Windows 10/11
-- .NET 8 SDK
-- AWS Bedrock access if you want AI responses
-- Microphone for speech features
+## 🪄 Setup & Installation
 
-Step‑by‑step:
+### Prerequisites
+- [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download)
+- [SQLite](https://www.sqlite.org/download.html)
+- AWS Account with Bedrock Access
 
-1) Clone the repository
-
-```bash
-git clone "https://github.com/your-org/AskMeNow.git"
-cd "AskMeNow"
-```
-
-2) Install dependencies
+### Installation Steps
 
 ```bash
+# 1. Clone the repository
+git clone https://github.com/yourusername/AskMeNow.git
+
+# 2. Navigate to project folder
+cd AskMeNow
+
+# 3. Restore dependencies
 dotnet restore
-```
 
-3) Configure settings
+# 4. Build the project
+dotnet build
 
-- Update `AskMeNow.Infrastructure/appsettings.json` and `AskMeNow.UI/appsettings.json` with your region/model if using AWS Bedrock.
-- Provide AWS credentials via one of the standard methods:
-  - Environment variables: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
-  - AWS CLI/Shared credentials file
-- Database: SQLite is local and works out of the box (no extra setup needed).
+# 5. Run the WPF application
+dotnet run --project src/AskMeNow.UI
 
-4) Run the app
+---
 
-```bash
-dotnet run --project "AskMeNow.UI"
-```
+##🧭 Usage Examples
 
-Alternatively, open the solution `AskMeNow.sln` in Visual Studio, set `AskMeNow.UI` as startup project, then Run.
-
-## Usage Examples
-
-After launching the app:
-
-1) Add your documents (PDFs, text, notes).
-2) Type a question in plain English.
-3) The app finds the most relevant snippets and answers clearly with sources.
-4) Explore suggested follow‑up questions or ask your own.
-5) Optionally use speech‑to‑text to dictate questions, and text‑to‑speech to listen to answers.
-
-Example scenario:
-
-- Upload a company FAQ and a few PDFs → Ask “What is our refund policy?” → See a concise answer with a reference and a preview snippet → Click to open the source document if needed.
+- Launch the app – Start AskMeNow on your desktop.
+- Upload Documents – Add your .pdf, .docx, .xlsx, or .txt files.
+- Ask Questions – Type questions
+- View Answers – AI fetches the relevant context and provides cited responses.
+- Preview & Export – Review document in preview panel and export your Q&A history.
+---
 
 ## Screenshots
 
@@ -137,6 +138,8 @@ Placeholders (replace with your own images in `docs/Screenshots`):
 ![Search Results](docs/Screenshots/screenshot-3.png)
 ![Document Preview](docs/Screenshots/screenshot-4.png)
 
+---
+
 ## Demo
 
 Watch a quick walkthrough:
@@ -145,6 +148,37 @@ Watch a quick walkthrough:
 - Placeholder path: `/docs/videos/demo.mp4`
 - Or add an online link: `https://your-demo-link.example.com`
 
+---
+
+## 🔐 Security & Best Practices
+
+- ✅ Secure file handling – prevents path traversal & unsafe uploads.
+- ✅ Input validation before ingestion.
+- ✅ Async/await used to avoid UI freezing.
+- ✅ SOLID principles strictly followed.
+- ✅ No hardcoded keys or sensitive data in code.
+
+---
+
+## 🧠 Clean Architecture Principles
+- Single Responsibility: Each service handles a distinct concern (e.g., parsing, retrieval, answering).
+- Open/Closed: Easily extend new parsers for new file formats.
+- Dependency Inversion: Core logic doesn’t depend on infrastructure details.
+- Interface Segregation: Separate contracts for parsing, embeddings, and retrieval.
+- Liskov Substitution: Services can be interchanged without breaking functionality.
+
+---
+
+## 🧩 Design Patterns Used
+| Pattern                    | Purpose                             |
+| -------------------------- | ----------------------------------- |
+| **Repository Pattern**     | Decouples data access logic         |
+| **Factory Pattern**        | Dynamically create file parsers     |
+| **Strategy Pattern**       | Switch between retrieval strategies |
+| **Command Pattern (MVVM)** | Handle WPF UI commands cleanly      |
+
+---
+
 ## Roadmap / Future Enhancements
 
 - Add support for audio files (.mp3, .wav, etc.)
@@ -152,15 +186,13 @@ Watch a quick walkthrough:
 - Add advanced semantic search and embeddings
 - Build a web‑based version with the same functionality
 
-## Security & Best Practices
+---
 
-We care about safety, reliability, and maintainability:
+## 👩‍💻 Contributor
+| Name             | Role                             |
+| ---------------- | -------------------------------- |
+| **Ashita Rathi** | Creator, Developer, and Designer |
 
-- Safe file handling: Prevents path traversal and restricts file access to allowed locations.
-- Input validation: Cleans and validates content before ingestion and processing.
-- Async operations: Uses asynchronous calls to keep the UI responsive and fast.
-- SOLID principles & Clean Architecture: Clear boundaries between UI, Core, Infrastructure, and Application.
-- Repository pattern: Predictable and testable data access.
 
 ---
 
