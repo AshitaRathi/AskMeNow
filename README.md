@@ -29,17 +29,17 @@ AskMeNow automates that process by:
 
 ## 💡 Key Features
 
-✅ **Smart Q&A** – Ask questions in plain English and get concise, sourced answers.
-✅ **Document-aware chat** – Handles `.pdf`, `.docx`, `.xlsx`, `.txt`, `.md`, `.json`, `.html`, and `.htm`. Upload files and chat with their contents as if they were a teammate.
-✅ **Suggested questions** – Get helpful follow‑ups to keep your research moving.
-✅ **Fast search** – - Fast search: Pulls relevant snippets instead of dumping entire documents at you.
-✅ **Real-Time Preview** – Instantly preview documents in the side panel.  
-✅ **Sentiment insights** – Understand tone and intent in conversations when needed.
-✅ **Speech support** – Speech‑to‑text and text‑to‑speech to talk hands‑free.  
-✅ **Conversational Memory** – Keeps context across related questions.  
-✅ **Smart Retrieval Pipeline** – Embeddings, chunking, and multi-query expansion for relevance.  
-✅ **Export Q&A Sessions** – Save, review, and share your question-answer sessions.  
-✅ **Clean Architecture + MVVM** – Ensures modularity, scalability, and testability.
+- ✅ **Smart Q&A** – Ask questions in plain English and get concise, sourced answers.
+- ✅ **Document-aware chat** – Handles `.pdf`, `.docx`, `.xlsx`, `.txt`, `.md`, `.json`, `.html`, and `.htm`. Upload files and chat with their contents as if they were a teammate.
+- ✅ **Suggested questions** – Get helpful follow‑ups to keep your research moving.
+- ✅ **Fast search** – - Fast search: Pulls relevant snippets instead of dumping entire documents at you.
+- ✅ **Real-Time Preview** – Instantly preview documents in the side panel.  
+- ✅ **Sentiment insights** – Understand tone and intent in conversations when needed.
+- ✅ **Speech support** – Speech‑to‑text and text‑to‑speech to talk hands‑free.  
+- ✅ **Conversational Memory** – Keeps context across related questions.  
+- ✅ **Smart Retrieval Pipeline** – Embeddings, chunking, and multi-query expansion for relevance.  
+- ✅ **Export Q&A Sessions** – Save, review, and share your question-answer sessions.  
+- ✅ **Clean Architecture + MVVM** – Ensures modularity, scalability, and testability.
 
 ---
 
@@ -117,6 +117,7 @@ dotnet build
 
 # 5. Run the WPF application
 dotnet run --project src/AskMeNow.UI
+```
 
 ---
 
