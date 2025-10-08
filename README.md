@@ -193,10 +193,3 @@ Watch a quick walkthrough:
 | Name             | Role                             |
 | ---------------- | -------------------------------- |
 | **Ashita Rathi** | Creator, Developer, and Designer |
-
-
----
-
-Made with ❤️ to help you spend less time searching and more time doing. If you like it, a ⭐ on GitHub goes a long way!
-
-
