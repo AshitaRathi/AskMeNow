@@ -1,10 +1,11 @@
 using AskMeNow.Core.Entities;
 
-namespace AskMeNow.Core.Interfaces;
-
-public interface IDocumentRepository
+namespace AskMeNow.Core.Interfaces
 {
-    Task<List<FAQDocument>> LoadDocumentsFromFolderAsync(string folderPath);
-    string GetAllContent();
-    FileProcessingResult? GetLastProcessingResult();
+    public interface IDocumentRepository
+    {
+        Task<List<FAQDocument>> LoadDocumentsFromFolderAsync(string folderPath);
+        string GetAllContent();
+        FileProcessingResult? GetLastProcessingResult();
+    }
 }

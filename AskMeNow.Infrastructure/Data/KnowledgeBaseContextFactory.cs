@@ -1,18 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace AskMeNow.Infrastructure.Data;
-
-public class KnowledgeBaseContextFactory : IDesignTimeDbContextFactory<KnowledgeBaseContext>
+namespace AskMeNow.Infrastructure.Data
 {
-    public KnowledgeBaseContext CreateDbContext(string[] args)
+    public class KnowledgeBaseContextFactory : IDesignTimeDbContextFactory<KnowledgeBaseContext>
     {
-        var optionsBuilder = new DbContextOptionsBuilder<KnowledgeBaseContext>();
-        // Use Infrastructure bin folder for organized location
-        var infrastructureBinPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "AskMeNow.Infrastructure", "bin", "Debug", "net8.0");
-        var dbPath = Path.Combine(infrastructureBinPath, "knowledgebase.db");
-        optionsBuilder.UseSqlite($"Data Source={dbPath}");
+        public KnowledgeBaseContext CreateDbContext(string[] args)
+        {
+            var optionsBuilder = new DbContextOptionsBuilder<KnowledgeBaseContext>();
 
-        return new KnowledgeBaseContext(optionsBuilder.Options);
+            var infrastructureBinPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "AskMeNow.Infrastructure", "bin", "Debug", "net8.0");
+            var dbPath = Path.Combine(infrastructureBinPath, "knowledgebase.db");
+            optionsBuilder.UseSqlite($"Data Source={dbPath}");
+
+            return new KnowledgeBaseContext(optionsBuilder.Options);
+        }
     }
 }

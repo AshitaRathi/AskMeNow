@@ -1,23 +1,23 @@
 using System.Globalization;
 using System.Windows.Data;
 
-namespace AskMeNow.UI.Converters;
-
-public class RecordingLevelConverter : IValueConverter
+namespace AskMeNow.UI.Converters
 {
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    public class RecordingLevelConverter : IValueConverter
     {
-        if (value is float level)
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            // Convert recording level (0.0 to 1.0) to width percentage
-            var percentage = Math.Max(0, Math.Min(1, level));
-            return percentage * 200; // 200 is the width of the progress bar
+            if (value is float level)
+            {
+                var percentage = Math.Max(0, Math.Min(1, level));
+                return percentage * 200;
+            }
+            return 0;
         }
-        return 0;
-    }
 
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        throw new NotImplementedException();
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

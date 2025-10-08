@@ -2,112 +2,106 @@ using AskMeNow.Core.Entities;
 using AskMeNow.Core.Interfaces;
 using System.Collections.Concurrent;
 
-namespace AskMeNow.Infrastructure.Services;
-
-public class DocumentCacheService : IDocumentCacheService
+namespace AskMeNow.Infrastructure.Services
 {
-    private readonly IDocumentRepository _documentRepository;
-    private readonly IDocumentChunkingService _chunkingService;
-    private readonly ConcurrentDictionary<string, List<FAQDocument>> _documentCache = new();
-    private readonly ConcurrentDictionary<string, string> _contentCache = new();
-    private readonly ConcurrentDictionary<string, List<DocumentChunk>> _chunkCache = new();
-    private readonly ConcurrentDictionary<string, FileProcessingResult> _processingResultCache = new();
-    private string _currentFolderPath = string.Empty;
-
-    public DocumentCacheService(IDocumentRepository documentRepository, IDocumentChunkingService chunkingService)
+    public class DocumentCacheService : IDocumentCacheService
     {
-        _documentRepository = documentRepository;
-        _chunkingService = chunkingService;
-    }
+        private readonly IDocumentRepository _documentRepository;
+        private readonly IDocumentChunkingService _chunkingService;
+        private readonly ConcurrentDictionary<string, List<FAQDocument>> _documentCache = new();
+        private readonly ConcurrentDictionary<string, string> _contentCache = new();
+        private readonly ConcurrentDictionary<string, List<DocumentChunk>> _chunkCache = new();
+        private readonly ConcurrentDictionary<string, FileProcessingResult> _processingResultCache = new();
+        private string _currentFolderPath = string.Empty;
 
-    public bool IsCacheValid => !string.IsNullOrEmpty(_currentFolderPath) && _documentCache.ContainsKey(_currentFolderPath);
-
-    public async Task<List<FAQDocument>> LoadAndCacheDocumentsAsync(string folderPath)
-    {
-        if (string.IsNullOrEmpty(folderPath))
-            throw new ArgumentException("Folder path cannot be null or empty.", nameof(folderPath));
-
-        // Check if we already have cached documents for this folder
-        if (_documentCache.TryGetValue(folderPath, out var cachedDocuments))
+        public DocumentCacheService(IDocumentRepository documentRepository, IDocumentChunkingService chunkingService)
         {
-            _currentFolderPath = folderPath;
-            return cachedDocuments;
+            _documentRepository = documentRepository;
+            _chunkingService = chunkingService;
         }
 
-        // Load documents from repository
-        var documents = await _documentRepository.LoadDocumentsFromFolderAsync(folderPath);
-        
-        // Cache the documents
-        _documentCache.TryAdd(folderPath, documents);
-        
-        // Create chunks for better RAG
-        var chunks = _chunkingService.ChunkDocuments(documents);
-        _chunkCache.TryAdd(folderPath, chunks);
-        
-        // Cache the combined content
-        var combinedContent = string.Join("\n\n", documents.Select(d => $"Document: {d.Title} ({Path.GetExtension(d.FilePath)})\n{d.Content}"));
-        _contentCache.TryAdd(folderPath, combinedContent);
-        
-        // Cache the processing result
-        var processingResult = _documentRepository.GetLastProcessingResult();
-        if (processingResult != null)
+        public bool IsCacheValid => !string.IsNullOrEmpty(_currentFolderPath) && _documentCache.ContainsKey(_currentFolderPath);
+
+        public async Task<List<FAQDocument>> LoadAndCacheDocumentsAsync(string folderPath)
         {
-            _processingResultCache.TryAdd(folderPath, processingResult);
-        }
-        
-        _currentFolderPath = folderPath;
-        
-        return documents;
-    }
+            if (string.IsNullOrEmpty(folderPath))
+                throw new ArgumentException("Folder path cannot be null or empty.", nameof(folderPath));
 
-    public string GetCachedContent()
-    {
-        if (string.IsNullOrEmpty(_currentFolderPath))
-            return string.Empty;
-
-        return _contentCache.TryGetValue(_currentFolderPath, out var content) ? content : string.Empty;
-    }
-
-    public string GetRelevantContentForQuestion(string question)
-    {
-        if (string.IsNullOrEmpty(_currentFolderPath) || string.IsNullOrWhiteSpace(question))
-            return GetCachedContent();
-
-        if (_chunkCache.TryGetValue(_currentFolderPath, out var chunks))
-        {
-            var relevantChunks = _chunkingService.FindRelevantChunks(question, chunks, 5);
-            if (relevantChunks.Any())
+            if (_documentCache.TryGetValue(folderPath, out var cachedDocuments))
             {
-                return string.Join("\n\n", relevantChunks.Select(c => $"From {c.SourceDocument}:\n{c.Content}"));
+                _currentFolderPath = folderPath;
+                return cachedDocuments;
             }
+
+            var documents = await _documentRepository.LoadDocumentsFromFolderAsync(folderPath);
+
+            _documentCache.TryAdd(folderPath, documents);
+
+            var chunks = _chunkingService.ChunkDocuments(documents);
+            _chunkCache.TryAdd(folderPath, chunks);
+
+            var combinedContent = string.Join("\n\n", documents.Select(d => $"Document: {d.Title} ({Path.GetExtension(d.FilePath)})\n{d.Content}"));
+            _contentCache.TryAdd(folderPath, combinedContent);
+
+            var processingResult = _documentRepository.GetLastProcessingResult();
+            if (processingResult != null)
+            {
+                _processingResultCache.TryAdd(folderPath, processingResult);
+            }
+
+            _currentFolderPath = folderPath;
+
+            return documents;
         }
 
-        // Fallback to full content if no relevant chunks found
-        return GetCachedContent();
-    }
+        public string GetCachedContent()
+        {
+            if (string.IsNullOrEmpty(_currentFolderPath))
+                return string.Empty;
 
-    public List<FAQDocument> GetCachedDocuments()
-    {
-        if (string.IsNullOrEmpty(_currentFolderPath))
-            return new List<FAQDocument>();
+            return _contentCache.TryGetValue(_currentFolderPath, out var content) ? content : string.Empty;
+        }
 
-        return _documentCache.TryGetValue(_currentFolderPath, out var documents) ? documents : new List<FAQDocument>();
-    }
+        public string GetRelevantContentForQuestion(string question)
+        {
+            if (string.IsNullOrEmpty(_currentFolderPath) || string.IsNullOrWhiteSpace(question))
+                return GetCachedContent();
 
-    public FileProcessingResult? GetLastProcessingResult()
-    {
-        if (string.IsNullOrEmpty(_currentFolderPath))
-            return null;
+            if (_chunkCache.TryGetValue(_currentFolderPath, out var chunks))
+            {
+                var relevantChunks = _chunkingService.FindRelevantChunks(question, chunks, 5);
+                if (relevantChunks.Any())
+                {
+                    return string.Join("\n\n", relevantChunks.Select(c => $"From {c.SourceDocument}:\n{c.Content}"));
+                }
+            }
 
-        return _processingResultCache.TryGetValue(_currentFolderPath, out var result) ? result : null;
-    }
+            return GetCachedContent();
+        }
 
-    public void ClearCache()
-    {
-        _documentCache.Clear();
-        _contentCache.Clear();
-        _chunkCache.Clear();
-        _processingResultCache.Clear();
-        _currentFolderPath = string.Empty;
+        public List<FAQDocument> GetCachedDocuments()
+        {
+            if (string.IsNullOrEmpty(_currentFolderPath))
+                return new List<FAQDocument>();
+
+            return _documentCache.TryGetValue(_currentFolderPath, out var documents) ? documents : new List<FAQDocument>();
+        }
+
+        public FileProcessingResult? GetLastProcessingResult()
+        {
+            if (string.IsNullOrEmpty(_currentFolderPath))
+                return null;
+
+            return _processingResultCache.TryGetValue(_currentFolderPath, out var result) ? result : null;
+        }
+
+        public void ClearCache()
+        {
+            _documentCache.Clear();
+            _contentCache.Clear();
+            _chunkCache.Clear();
+            _processingResultCache.Clear();
+            _currentFolderPath = string.Empty;
+        }
     }
 }

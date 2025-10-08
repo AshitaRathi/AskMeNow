@@ -3,164 +3,154 @@ using AskMeNow.Core.Interfaces;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace AskMeNow.Infrastructure.Services;
-
-public class SentimentAnalysisService : ISentimentAnalysisService
+namespace AskMeNow.Infrastructure.Services
 {
-    private readonly IBedrockClientService _bedrockService;
-
-    public SentimentAnalysisService(IBedrockClientService bedrockService)
+    public class SentimentAnalysisService : ISentimentAnalysisService
     {
-        _bedrockService = bedrockService;
-    }
+        private readonly IBedrockClientService _bedrockService;
 
-    public async Task<SentimentAnalysisResult> AnalyzeAsync(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
+        public SentimentAnalysisService(IBedrockClientService bedrockService)
         {
+            _bedrockService = bedrockService;
+        }
+
+        public async Task<SentimentAnalysisResult> AnalyzeAsync(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return new SentimentAnalysisResult
+                {
+                    Sentiment = Sentiment.Neutral,
+                    Intent = Intent.Other,
+                    Confidence = 0.0,
+                    OriginalText = text
+                };
+            }
+
+            var ruleBasedResult = AnalyzeWithRules(text);
+            if (ruleBasedResult.Confidence > 0.8)
+            {
+                return ruleBasedResult;
+            }
+
+            return await AnalyzeWithLLM(text);
+        }
+
+        private SentimentAnalysisResult AnalyzeWithRules(string text)
+        {
+            var lowerText = text.ToLowerInvariant().Trim();
+            var normalizedText = Regex.Replace(lowerText, @"[^\w\s]", "").Trim();
+            var words = normalizedText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            var intent = DetectIntentWithRules(normalizedText, words);
+            var sentiment = DetectSentimentWithRules(normalizedText, words);
+            var confidence = CalculateRuleBasedConfidence(intent, sentiment, normalizedText);
+
             return new SentimentAnalysisResult
             {
-                Sentiment = Sentiment.Neutral,
-                Intent = Intent.Other,
-                Confidence = 0.0,
+                Sentiment = sentiment,
+                Intent = intent,
+                Confidence = confidence,
                 OriginalText = text
             };
         }
 
-        // First try rule-based analysis for common patterns
-        var ruleBasedResult = AnalyzeWithRules(text);
-        if (ruleBasedResult.Confidence > 0.8)
+        private Intent DetectIntentWithRules(string normalizedText, string[] words)
         {
-            return ruleBasedResult;
-        }
-
-        // Fall back to LLM-based analysis for complex cases
-        return await AnalyzeWithLLM(text);
-    }
-
-    private SentimentAnalysisResult AnalyzeWithRules(string text)
-    {
-        var lowerText = text.ToLowerInvariant().Trim();
-        var normalizedText = Regex.Replace(lowerText, @"[^\w\s]", "").Trim();
-        var words = normalizedText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-        // Intent detection patterns
-        var intent = DetectIntentWithRules(normalizedText, words);
-        var sentiment = DetectSentimentWithRules(normalizedText, words);
-        var confidence = CalculateRuleBasedConfidence(intent, sentiment, normalizedText);
-
-        return new SentimentAnalysisResult
-        {
-            Sentiment = sentiment,
-            Intent = intent,
-            Confidence = confidence,
-            OriginalText = text
-        };
-    }
-
-    private Intent DetectIntentWithRules(string normalizedText, string[] words)
-    {
-        // Greeting patterns
-        var greetingPatterns = new[]
-        {
+            var greetingPatterns = new[]
+            {
             "hi", "hello", "hey", "hiya", "howdy", "good morning", "good afternoon", "good evening",
             "morning", "afternoon", "evening", "how are you", "how do you do", "whats up", "sup"
         };
 
-        foreach (var pattern in greetingPatterns)
-        {
-            if (normalizedText.Contains(pattern) || normalizedText.StartsWith(pattern + " "))
-                return Intent.Greeting;
-        }
+            foreach (var pattern in greetingPatterns)
+            {
+                if (normalizedText.Contains(pattern) || normalizedText.StartsWith(pattern + " "))
+                    return Intent.Greeting;
+            }
 
-        // Small talk patterns
-        var smallTalkPatterns = new[]
-        {
+            var smallTalkPatterns = new[]
+            {
             "how are you", "how do you do", "whats up", "sup", "how is it going", "how are things",
             "nice day", "beautiful day", "weather", "weekend", "holiday", "vacation"
         };
 
-        foreach (var pattern in smallTalkPatterns)
-        {
-            if (normalizedText.Contains(pattern))
-                return Intent.SmallTalk;
-        }
+            foreach (var pattern in smallTalkPatterns)
+            {
+                if (normalizedText.Contains(pattern))
+                    return Intent.SmallTalk;
+            }
 
-        // Complaint patterns
-        var complaintPatterns = new[]
-        {
+            var complaintPatterns = new[]
+            {
             "problem", "issue", "error", "bug", "broken", "not working", "doesn't work", "failed",
             "terrible", "awful", "horrible", "hate", "angry", "frustrated", "annoyed", "disappointed",
             "complain", "complaint", "wrong", "bad", "sucks", "worst", "useless"
         };
 
-        foreach (var pattern in complaintPatterns)
-        {
-            if (normalizedText.Contains(pattern))
-                return Intent.Complaint;
+            foreach (var pattern in complaintPatterns)
+            {
+                if (normalizedText.Contains(pattern))
+                    return Intent.Complaint;
+            }
+
+            if (normalizedText.Contains("?") ||
+                words.Any(w => w == "what" || w == "how" || w == "why" || w == "when" || w == "where" || w == "who" || w == "which"))
+            {
+                return Intent.Question;
+            }
+
+            return Intent.Other;
         }
 
-        // Question patterns
-        if (normalizedText.Contains("?") || 
-            words.Any(w => w == "what" || w == "how" || w == "why" || w == "when" || w == "where" || w == "who" || w == "which"))
+        private Sentiment DetectSentimentWithRules(string normalizedText, string[] words)
         {
-            return Intent.Question;
-        }
-
-        return Intent.Other;
-    }
-
-    private Sentiment DetectSentimentWithRules(string normalizedText, string[] words)
-    {
-        // Positive sentiment words
-        var positiveWords = new[]
-        {
+            var positiveWords = new[]
+            {
             "good", "great", "excellent", "amazing", "wonderful", "fantastic", "awesome", "perfect",
             "love", "like", "enjoy", "happy", "pleased", "satisfied", "thank", "thanks", "appreciate",
             "helpful", "useful", "brilliant", "outstanding", "superb", "marvelous", "delighted"
         };
 
-        // Negative sentiment words
-        var negativeWords = new[]
-        {
+            var negativeWords = new[]
+            {
             "bad", "terrible", "awful", "horrible", "hate", "dislike", "angry", "frustrated", "annoyed",
             "disappointed", "sad", "upset", "worried", "concerned", "problem", "issue", "error", "bug",
             "broken", "failed", "wrong", "sucks", "worst", "useless", "stupid", "dumb", "ridiculous"
         };
 
-        var positiveCount = words.Count(w => positiveWords.Contains(w));
-        var negativeCount = words.Count(w => negativeWords.Contains(w));
+            var positiveCount = words.Count(w => positiveWords.Contains(w));
+            var negativeCount = words.Count(w => negativeWords.Contains(w));
 
-        if (negativeCount > positiveCount)
-            return Sentiment.Negative;
-        if (positiveCount > negativeCount)
-            return Sentiment.Positive;
-        
-        return Sentiment.Neutral;
-    }
+            if (negativeCount > positiveCount)
+                return Sentiment.Negative;
+            if (positiveCount > negativeCount)
+                return Sentiment.Positive;
 
-    private double CalculateRuleBasedConfidence(Intent intent, Sentiment sentiment, string normalizedText)
-    {
-        double confidence = 0.5; // Base confidence
+            return Sentiment.Neutral;
+        }
 
-        // Increase confidence for clear patterns
-        if (intent == Intent.Greeting && (normalizedText.Contains("hello") || normalizedText.Contains("hi")))
-            confidence += 0.3;
-        
-        if (intent == Intent.Complaint && (normalizedText.Contains("problem") || normalizedText.Contains("issue")))
-            confidence += 0.3;
-        
-        if (intent == Intent.Question && normalizedText.Contains("?"))
-            confidence += 0.2;
-
-        return Math.Min(confidence, 1.0);
-    }
-
-    private async Task<SentimentAnalysisResult> AnalyzeWithLLM(string text)
-    {
-        try
+        private double CalculateRuleBasedConfidence(Intent intent, Sentiment sentiment, string normalizedText)
         {
-            var prompt = $@"Analyze the following text and return a JSON response with sentiment and intent classification.
+            double confidence = 0.5;
+
+            if (intent == Intent.Greeting && (normalizedText.Contains("hello") || normalizedText.Contains("hi")))
+                confidence += 0.3;
+
+            if (intent == Intent.Complaint && (normalizedText.Contains("problem") || normalizedText.Contains("issue")))
+                confidence += 0.3;
+
+            if (intent == Intent.Question && normalizedText.Contains("?"))
+                confidence += 0.2;
+
+            return Math.Min(confidence, 1.0);
+        }
+
+        private async Task<SentimentAnalysisResult> AnalyzeWithLLM(string text)
+        {
+            try
+            {
+                var prompt = $@"Analyze the following text and return a JSON response with sentiment and intent classification.
 
 Text: ""{text}""
 
@@ -176,97 +166,95 @@ Return only valid JSON in this format:
     ""confidence"": 0.85
 }}";
 
-            var response = await _bedrockService.GenerateAnswerAsync(prompt, "");
-            
-            if (string.IsNullOrWhiteSpace(response))
-            {
-                return GetFallbackResult(text);
-            }
+                var response = await _bedrockService.GenerateAnswerAsync(prompt, "");
 
-            // Try to parse JSON response
-            var jsonResponse = ExtractJsonFromResponse(response);
-            var result = JsonSerializer.Deserialize<LLMAnalysisResponse>(jsonResponse, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            if (result != null)
-            {
-                return new SentimentAnalysisResult
+                if (string.IsNullOrWhiteSpace(response))
                 {
-                    Sentiment = ParseSentiment(result.Sentiment),
-                    Intent = ParseIntent(result.Intent),
-                    Confidence = Math.Max(0.0, Math.Min(1.0, result.Confidence)),
-                    OriginalText = text
-                };
+                    return GetFallbackResult(text);
+                }
+
+                var jsonResponse = ExtractJsonFromResponse(response);
+                var result = JsonSerializer.Deserialize<LLMAnalysisResponse>(jsonResponse, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (result != null)
+                {
+                    return new SentimentAnalysisResult
+                    {
+                        Sentiment = ParseSentiment(result.Sentiment),
+                        Intent = ParseIntent(result.Intent),
+                        Confidence = Math.Max(0.0, Math.Min(1.0, result.Confidence)),
+                        OriginalText = text
+                    };
+                }
             }
+            catch (Exception)
+            {
+
+            }
+
+            return GetFallbackResult(text);
         }
-        catch (Exception)
+
+        private string ExtractJsonFromResponse(string response)
         {
-            // Fall back to rule-based analysis if LLM fails
+            var jsonStart = response.IndexOf('{');
+            var jsonEnd = response.LastIndexOf('}');
+
+            if (jsonStart >= 0 && jsonEnd > jsonStart)
+            {
+                return response.Substring(jsonStart, jsonEnd - jsonStart + 1);
+            }
+
+            return response;
         }
 
-        return GetFallbackResult(text);
-    }
-
-    private string ExtractJsonFromResponse(string response)
-    {
-        // Try to find JSON in the response
-        var jsonStart = response.IndexOf('{');
-        var jsonEnd = response.LastIndexOf('}');
-        
-        if (jsonStart >= 0 && jsonEnd > jsonStart)
+        private Sentiment ParseSentiment(string sentiment)
         {
-            return response.Substring(jsonStart, jsonEnd - jsonStart + 1);
+            return sentiment?.ToLowerInvariant() switch
+            {
+                "positive" => Sentiment.Positive,
+                "negative" => Sentiment.Negative,
+                "neutral" => Sentiment.Neutral,
+                _ => Sentiment.Neutral
+            };
         }
-        
-        return response;
-    }
 
-    private Sentiment ParseSentiment(string sentiment)
-    {
-        return sentiment?.ToLowerInvariant() switch
+        private Intent ParseIntent(string intent)
         {
-            "positive" => Sentiment.Positive,
-            "negative" => Sentiment.Negative,
-            "neutral" => Sentiment.Neutral,
-            _ => Sentiment.Neutral
-        };
-    }
+            return intent?.ToLowerInvariant() switch
+            {
+                "greeting" => Intent.Greeting,
+                "smalltalk" => Intent.SmallTalk,
+                "question" => Intent.Question,
+                "complaint" => Intent.Complaint,
+                "other" => Intent.Other,
+                _ => Intent.Other
+            };
+        }
 
-    private Intent ParseIntent(string intent)
-    {
-        return intent?.ToLowerInvariant() switch
+        private SentimentAnalysisResult GetFallbackResult(string text)
         {
-            "greeting" => Intent.Greeting,
-            "smalltalk" => Intent.SmallTalk,
-            "question" => Intent.Question,
-            "complaint" => Intent.Complaint,
-            "other" => Intent.Other,
-            _ => Intent.Other
-        };
-    }
+            var lowerText = text.ToLowerInvariant().Trim();
+            var normalizedText = Regex.Replace(lowerText, @"[^\w\s]", "").Trim();
+            var words = normalizedText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-    private SentimentAnalysisResult GetFallbackResult(string text)
-    {
-        // Fallback to rule-based analysis
-        var lowerText = text.ToLowerInvariant().Trim();
-        var normalizedText = Regex.Replace(lowerText, @"[^\w\s]", "").Trim();
-        var words = normalizedText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return new SentimentAnalysisResult
+            {
+                Sentiment = DetectSentimentWithRules(normalizedText, words),
+                Intent = DetectIntentWithRules(normalizedText, words),
+                Confidence = 0.6,
+                OriginalText = text
+            };
+        }
 
-        return new SentimentAnalysisResult
+        private class LLMAnalysisResponse
         {
-            Sentiment = DetectSentimentWithRules(normalizedText, words),
-            Intent = DetectIntentWithRules(normalizedText, words),
-            Confidence = 0.6, // Moderate confidence for fallback
-            OriginalText = text
-        };
-    }
-
-    private class LLMAnalysisResponse
-    {
-        public string Sentiment { get; set; } = string.Empty;
-        public string Intent { get; set; } = string.Empty;
-        public double Confidence { get; set; }
+            public string Sentiment { get; set; } = string.Empty;
+            public string Intent { get; set; } = string.Empty;
+            public double Confidence { get; set; }
+        }
     }
 }

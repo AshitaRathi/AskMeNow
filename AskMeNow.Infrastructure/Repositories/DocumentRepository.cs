@@ -1,49 +1,48 @@
 using AskMeNow.Core.Entities;
 using AskMeNow.Core.Interfaces;
 
-namespace AskMeNow.Infrastructure.Repositories;
-
-public class DocumentRepository : IDocumentRepository
+namespace AskMeNow.Infrastructure.Repositories
 {
-    private readonly IDocumentParserService _parserService;
-    private List<FAQDocument> _documents = new();
-    private string _allContent = string.Empty;
-    private FileProcessingResult? _lastProcessingResult;
-
-    public DocumentRepository(IDocumentParserService parserService)
+    public class DocumentRepository : IDocumentRepository
     {
-        _parserService = parserService;
-    }
+        private readonly IDocumentParserService _parserService;
+        private List<FAQDocument> _documents = new();
+        private string _allContent = string.Empty;
+        private FileProcessingResult? _lastProcessingResult;
 
-    public async Task<List<FAQDocument>> LoadDocumentsFromFolderAsync(string folderPath)
-    {
-        _documents.Clear();
-        _allContent = string.Empty;
-
-        if (!Directory.Exists(folderPath))
+        public DocumentRepository(IDocumentParserService parserService)
         {
-            throw new DirectoryNotFoundException($"Folder not found: {folderPath}");
+            _parserService = parserService;
         }
 
-        // Get file processing statistics
-        _lastProcessingResult = await _parserService.GetFileProcessingStatsAsync(folderPath);
+        public async Task<List<FAQDocument>> LoadDocumentsFromFolderAsync(string folderPath)
+        {
+            _documents.Clear();
+            _allContent = string.Empty;
 
-        // Use the parser service to load all supported document types
-        var documents = await _parserService.ParseDocumentsFromFolderAsync(folderPath);
+            if (!Directory.Exists(folderPath))
+            {
+                throw new DirectoryNotFoundException($"Folder not found: {folderPath}");
+            }
 
-        _documents = documents;
-        _allContent = string.Join("\n\n", documents.Select(d => $"Document: {d.Title} ({Path.GetExtension(d.FilePath)})\n{d.Content}"));
+            _lastProcessingResult = await _parserService.GetFileProcessingStatsAsync(folderPath);
 
-        return documents;
-    }
+            var documents = await _parserService.ParseDocumentsFromFolderAsync(folderPath);
 
-    public string GetAllContent()
-    {
-        return _allContent;
-    }
+            _documents = documents;
+            _allContent = string.Join("\n\n", documents.Select(d => $"Document: {d.Title} ({Path.GetExtension(d.FilePath)})\n{d.Content}"));
 
-    public FileProcessingResult? GetLastProcessingResult()
-    {
-        return _lastProcessingResult;
+            return documents;
+        }
+
+        public string GetAllContent()
+        {
+            return _allContent;
+        }
+
+        public FileProcessingResult? GetLastProcessingResult()
+        {
+            return _lastProcessingResult;
+        }
     }
 }

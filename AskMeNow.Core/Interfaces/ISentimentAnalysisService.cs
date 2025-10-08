@@ -1,8 +1,9 @@
 using AskMeNow.Core.Entities;
 
-namespace AskMeNow.Core.Interfaces;
-
-public interface ISentimentAnalysisService
+namespace AskMeNow.Core.Interfaces
 {
-    Task<SentimentAnalysisResult> AnalyzeAsync(string text);
+    public interface ISentimentAnalysisService
+    {
+        Task<SentimentAnalysisResult> AnalyzeAsync(string text);
+    }
 }

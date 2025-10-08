@@ -1,26 +1,28 @@
-namespace AskMeNow.Core.Entities;
-
-public enum Sentiment
+namespace AskMeNow.Core.Entities
 {
-    Positive,
-    Negative,
-    Neutral
-}
+    public enum Sentiment
+    {
+        Positive,
+        Negative,
+        Neutral
+    }
 
-public enum Intent
-{
-    Greeting,
-    SmallTalk,
-    Question,
-    Complaint,
-    Other
-}
+    public enum Intent
+    {
+        Greeting,
+        SmallTalk,
+        Question,
+        Complaint,
+        Other
+    }
 
-public class SentimentAnalysisResult
-{
-    public Sentiment Sentiment { get; set; }
-    public Intent Intent { get; set; }
-    public double Confidence { get; set; }
-    public string OriginalText { get; set; } = string.Empty;
-    public DateTime AnalyzedAt { get; set; } = DateTime.UtcNow;
+    public class SentimentAnalysisResult
+    {
+        public Sentiment Sentiment { get; set; }
+        public Intent Intent { get; set; }
+        public double Confidence { get; set; }
+        public string OriginalText { get; set; } = string.Empty;
+        public DateTime AnalyzedAt { get; set; } = DateTime.UtcNow;
+    }
+
 }

@@ -3,106 +3,100 @@ using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using System.Text;
 
-namespace AskMeNow.Infrastructure.Services;
-
-public class EmbeddingService : IEmbeddingService, IDisposable
+namespace AskMeNow.Infrastructure.Services
 {
-    private readonly InferenceSession _session;
-    private readonly string _modelVersion = "1.0";
-    private readonly int _vectorDimensions = 384; // sentence-transformers/all-MiniLM-L6-v2 dimensions
-    private bool _disposed = false;
-
-    public EmbeddingService()
+    public class EmbeddingService : IEmbeddingService, IDisposable
     {
-        // For now, we'll use a simple text-based embedding approach
-        // In production, you would load an actual ONNX model here
-        _session = null!; // Placeholder - would be initialized with actual model
-    }
+        private readonly InferenceSession _session;
+        private readonly string _modelVersion = "1.0";
+        private readonly int _vectorDimensions = 384;
+        private bool _disposed = false;
 
-    public async Task<float[]> GenerateEmbeddingAsync(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-            return new float[_vectorDimensions];
-
-        // Simple hash-based embedding for demonstration
-        // In production, replace with actual ONNX model inference
-        return await Task.Run(() => GenerateSimpleEmbedding(text));
-    }
-
-    private float[] GenerateSimpleEmbedding(string text)
-    {
-        var embedding = new float[_vectorDimensions];
-        var words = text.ToLowerInvariant()
-                       .Split(new char[] { ' ', '\n', '\r', '\t', '.', ',', '!', '?', ';', ':', '(', ')', '[', ']', '{', '}' }, 
-                              StringSplitOptions.RemoveEmptyEntries)
-                       .Where(w => w.Length > 2)
-                       .ToArray();
-
-        // Create a simple embedding based on word hashes
-        for (int i = 0; i < _vectorDimensions; i++)
+        public EmbeddingService()
         {
-            float value = 0f;
-            foreach (var word in words)
-            {
-                var hash = word.GetHashCode();
-                var normalizedHash = (hash % 1000) / 1000f; // Normalize to 0-1
-                value += normalizedHash * (float)Math.Sin(i * 0.1 + hash * 0.01);
-            }
-            embedding[i] = (float)Math.Tanh(value / words.Length); // Normalize and bound
+            _session = null!;
         }
 
-        // Normalize the vector
-        var magnitude = Math.Sqrt(embedding.Sum(x => x * x));
-        if (magnitude > 0)
+        public async Task<float[]> GenerateEmbeddingAsync(string text)
         {
-            for (int i = 0; i < embedding.Length; i++)
-            {
-                embedding[i] /= (float)magnitude;
-            }
+            if (string.IsNullOrWhiteSpace(text))
+                return new float[_vectorDimensions];
+
+            return await Task.Run(() => GenerateSimpleEmbedding(text));
         }
 
-        return embedding;
-    }
-
-    public async Task<float> CalculateSimilarityAsync(float[] vector1, float[] vector2)
-    {
-        if (vector1.Length != vector2.Length)
-            throw new ArgumentException("Vectors must have the same dimensions");
-
-        return await Task.Run(() =>
+        private float[] GenerateSimpleEmbedding(string text)
         {
-            // Calculate cosine similarity
-            float dotProduct = 0f;
-            float magnitude1 = 0f;
-            float magnitude2 = 0f;
+            var embedding = new float[_vectorDimensions];
+            var words = text.ToLowerInvariant()
+                           .Split(new char[] { ' ', '\n', '\r', '\t', '.', ',', '!', '?', ';', ':', '(', ')', '[', ']', '{', '}' },
+                                  StringSplitOptions.RemoveEmptyEntries)
+                           .Where(w => w.Length > 2)
+                           .ToArray();
 
-            for (int i = 0; i < vector1.Length; i++)
+            for (int i = 0; i < _vectorDimensions; i++)
             {
-                dotProduct += vector1[i] * vector2[i];
-                magnitude1 += vector1[i] * vector1[i];
-                magnitude2 += vector2[i] * vector2[i];
+                float value = 0f;
+                foreach (var word in words)
+                {
+                    var hash = word.GetHashCode();
+                    var normalizedHash = (hash % 1000) / 1000f;
+                    value += normalizedHash * (float)Math.Sin(i * 0.1 + hash * 0.01);
+                }
+                embedding[i] = (float)Math.Tanh(value / words.Length);
             }
 
-            magnitude1 = (float)Math.Sqrt(magnitude1);
-            magnitude2 = (float)Math.Sqrt(magnitude2);
+            var magnitude = Math.Sqrt(embedding.Sum(x => x * x));
+            if (magnitude > 0)
+            {
+                for (int i = 0; i < embedding.Length; i++)
+                {
+                    embedding[i] /= (float)magnitude;
+                }
+            }
 
-            if (magnitude1 == 0 || magnitude2 == 0)
-                return 0f;
+            return embedding;
+        }
 
-            return dotProduct / (magnitude1 * magnitude2);
-        });
-    }
-
-    public int GetVectorDimensions() => _vectorDimensions;
-
-    public string GetModelVersion() => _modelVersion;
-
-    public void Dispose()
-    {
-        if (!_disposed)
+        public async Task<float> CalculateSimilarityAsync(float[] vector1, float[] vector2)
         {
-            _session?.Dispose();
-            _disposed = true;
+            if (vector1.Length != vector2.Length)
+                throw new ArgumentException("Vectors must have the same dimensions");
+
+            return await Task.Run(() =>
+            {
+                float dotProduct = 0f;
+                float magnitude1 = 0f;
+                float magnitude2 = 0f;
+
+                for (int i = 0; i < vector1.Length; i++)
+                {
+                    dotProduct += vector1[i] * vector2[i];
+                    magnitude1 += vector1[i] * vector1[i];
+                    magnitude2 += vector2[i] * vector2[i];
+                }
+
+                magnitude1 = (float)Math.Sqrt(magnitude1);
+                magnitude2 = (float)Math.Sqrt(magnitude2);
+
+                if (magnitude1 == 0 || magnitude2 == 0)
+                    return 0f;
+
+                return dotProduct / (magnitude1 * magnitude2);
+            });
+        }
+
+        public int GetVectorDimensions() => _vectorDimensions;
+
+        public string GetModelVersion() => _modelVersion;
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _session?.Dispose();
+                _disposed = true;
+            }
         }
     }
 }

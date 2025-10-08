@@ -1,235 +1,183 @@
-# AskMeNow - AI-Powered FAQ Bot
+## Project Title & Tagline
 
-A local FAQ Bot that uses AWS Bedrock models to answer user questions based on given documents/text context. Built with .NET 8, WPF, and Clean Architecture principles.
+- **AskMeNow**
+- A friendly desktop app that lets you chat with your documents and FAQs. 🎙️🤖
 
-## Features
+## About
 
-- 🤖 **AI-Powered Answers**: Uses AWS Bedrock (Claude 3 Sonnet) for intelligent question answering
-- 📁 **Document Loading**: Select a folder containing `.txt` files to build your knowledge base
-- 🎨 **Modern UI**: Clean, modern WPF interface with rounded corners and soft shadows
-- 💾 **Export Conversations**: Export your Q&A sessions to Markdown files
-- 🏗️ **Clean Architecture**: Follows Clean Architecture principles with proper separation of concerns
-- ⚡ **Real-time Processing**: Fast, responsive question answering
+AskMeNow is a Windows desktop app that turns your files and knowledge base into a helpful, conversational assistant. It was created to remove the friction of digging through folders, PDFs, and notes just to find a simple answer. The inspiration came from real-world teams who spend too much time searching instead of doing — AskMeNow brings the answers to you in plain language.
 
-## Prerequisites
+## Overview / Problem Statement
 
+- The problem: Finding information buried inside documents, wikis, and folders is slow and frustrating.
+- Who benefits: Individuals and teams who work with PDFs, docs, knowledge bases, FAQs, or research materials.
+- What makes it unique: It combines local document parsing, smart retrieval, and AI chat in one simple WPF app — with a clean architecture, optional offline capabilities, and pluggable services.
+
+## Key Features
+
+- Smart Q&A: Ask questions in plain English and get concise, sourced answers.
+- Document-aware chat: Upload files and chat with their contents as if they were a teammate.
+- Suggested questions: Get helpful follow‑ups to keep your research moving.
+- Fast search: Pulls relevant snippets instead of dumping entire documents at you.
+- Sentiment insights: Understand tone and intent in conversations when needed.
+- Speech support: Optional speech‑to‑text and text‑to‑speech to talk hands‑free.
+
+## Tech Stack
+
+- .NET 8, WPF (Windows)
+- EF Core, SQLite (local storage)
+- AWS Bedrock Claude (LLM)
+- Optional: Whisper (speech‑to‑text), simple TTS engine
+
+| Area | Technology |
+| --- | --- |
+| Language & Runtime | .NET 8 (C#) |
+| UI | WPF |
+| AI / LLM | AWS Bedrock Claude |
+| Data Access | Entity Framework Core |
+| Database | SQLite (local) |
+| Speech | Whisper STT, Simple TTS |
+
+## Architecture / Project Structure
+
+The app follows a clean, layered structure so each part has a single, clear purpose.
+
+- UI (`AskMeNow.UI`): The WPF desktop application. Shows views, binds to view models, and handles user interactions.
+- Core (`AskMeNow.Core`): The heart of the domain — entities, interfaces, and contracts that define how the system behaves.
+- Infrastructure (`AskMeNow.Infrastructure`): The concrete implementations — data access (EF Core/SQLite), external services (AWS Bedrock, Whisper), repositories, and configuration.
+- Application (`AskMeNow.Application`): Application‑level coordinators (handlers/services) that orchestrate workflows using Core interfaces.
+
+Optional diagram to visualize the layers:
+
+```
+┌───────────────────────────┐
+│         UI (WPF)          │  -> Views, ViewModels
+└─────────────▲─────────────┘
+              │ binds/calls
+┌─────────────┴─────────────┐
+│     Application Layer      │  -> Handlers, Orchestration
+└─────────────▲─────────────┘
+              │ depends on
+┌─────────────┴─────────────┐
+│          Core              │  -> Entities, Interfaces
+└─────────────▲─────────────┘
+              │ implemented by
+┌─────────────┴─────────────┐
+│       Infrastructure       │  -> EF Core, Repos, Bedrock, STT/TTS
+└───────────────────────────┘
+```
+
+Project folders of interest:
+
+- `AskMeNow.UI`: Views, view models, and app configuration (`App.xaml`).
+- `AskMeNow.Core`: Domain models (e.g., `Conversation`, `DocumentEntity`) and interfaces (e.g., `IEnhancedRetrievalService`).
+- `AskMeNow.Infrastructure`: EF Core `KnowledgeBaseContext`, repositories, AWS Bedrock client, speech services, and DI setup.
+- `AskMeNow.Application`: High‑level handlers (e.g., `QuestionHandler`) and services that wire the flow together.
+
+## Setup & Installation
+
+Prerequisites:
+
+- Windows 10/11
 - .NET 8 SDK
-- AWS Account with Bedrock access
-- Windows OS (for WPF)
+- (Optional) AWS account and Bedrock access if you want AI responses
+- (Optional) Microphone for speech features
 
-## Setup Instructions
+Step‑by‑step:
 
-### 1. Clone and Build
+1) Clone the repository
 
 ```bash
-git clone <repository-url>
-cd AskMeNow
+git clone "https://github.com/your-org/AskMeNow.git"
+cd "AskMeNow"
+```
+
+2) Install dependencies
+
+```bash
 dotnet restore
-dotnet build
 ```
 
-### 2. Configure AWS Credentials
+3) Configure settings
 
-1. Open `AskMeNow.UI/appsettings.json`
-2. Replace the placeholder values with your actual AWS credentials:
+- Update `AskMeNow.Infrastructure/appsettings.json` and `AskMeNow.UI/appsettings.json` with your region/model if using AWS Bedrock.
+- Provide AWS credentials via one of the standard methods:
+  - Environment variables: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
+  - AWS CLI/Shared credentials file
+  - IAM role (if running on an AWS host)
+- Database: SQLite is local and works out of the box (no extra setup needed).
 
-```json
-{
-  "AwsConfig": {
-    "AccessKey": "YOUR_ACTUAL_AWS_ACCESS_KEY",
-    "SecretKey": "YOUR_ACTUAL_AWS_SECRET_KEY",
-    "Region": "us-east-1",
-    "ModelId": "anthropic.claude-3-sonnet-20240229-v1:0"
-  }
-}
-```
-
-**Important Security Note**: Never commit your actual AWS credentials to version control. Consider using AWS IAM roles or environment variables for production use.
-
-### 3. AWS Bedrock Setup
-
-1. **Enable Bedrock Access**:
-   - Go to AWS Console → Amazon Bedrock
-   - Request access to the Claude 3 Sonnet model
-   - Wait for approval (usually takes a few minutes)
-
-2. **IAM Permissions**:
-   Ensure your AWS user/role has the following permissions:
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Effect": "Allow",
-         "Action": [
-           "bedrock:InvokeModel"
-         ],
-         "Resource": "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0"
-       }
-     ]
-   }
-   ```
-
-### 4. Prepare Your Documents
-
-1. Create a folder containing your `.txt` files
-2. Each `.txt` file will be treated as a separate document
-3. The content of all files will be combined to create your knowledge base
-
-**Example folder structure**:
-```
-MyDocuments/
-├── company-policies.txt
-├── product-manual.txt
-├── faq-answers.txt
-└── troubleshooting-guide.txt
-```
-
-### 5. Run the Application
+4) Run the app
 
 ```bash
-dotnet run --project AskMeNow.UI
+dotnet run --project "AskMeNow.UI"
 ```
 
-## Usage
+Alternatively, open the solution `AskMeNow.sln` in Visual Studio, set `AskMeNow.UI` as startup project, then Run.
 
-1. **Launch the Application**: Run the WPF application
-2. **Select Documents Folder**: Click "Select Documents Folder" and choose the folder containing your `.txt` files
-3. **Wait for Loading**: The app will load and process all documents
-4. **Ask Questions**: Type your questions in the text box and click "Ask Question"
-5. **View Answers**: AI-generated answers will appear in the response area
-6. **Export Conversations**: Click "Export Conversation" to save your Q&A session as a Markdown file
+## Usage Examples
 
-## Project Structure
+After launching the app:
 
-```
-AskMeNow/
-├── AskMeNow.Core/                 # Domain entities
-│   └── Entities/
-│       ├── FAQDocument.cs
-│       └── FAQAnswer.cs
-├── AskMeNow.Application/          # Use cases and business logic
-│   ├── Services/
-│   │   └── FAQService.cs
-│   └── Handlers/
-│       └── QuestionHandler.cs
-├── AskMeNow.Infrastructure/       # External services and data access
-│   ├── Services/
-│   │   └── BedrockClientService.cs
-│   ├── Repositories/
-│   │   └── DocumentRepository.cs
-│   └── Configuration/
-│       └── AwsConfig.cs
-├── AskMeNow.UI/                   # WPF user interface
-│   ├── Views/
-│   │   ├── MainWindow.xaml
-│   │   └── MainWindow.xaml.cs
-│   └── ViewModels/
-│       └── MainViewModel.cs
-└── README.md
-```
+1) Add your documents (PDFs, text, notes).
+2) Click “Ask” and type a question in plain English.
+3) The app finds the most relevant snippets and answers clearly with sources.
+4) Explore suggested follow‑up questions or ask your own.
+5) Optionally use speech‑to‑text to dictate questions, and text‑to‑speech to listen to answers.
 
-## Architecture
+Example scenario:
 
-The solution follows Clean Architecture principles:
+- Upload a company FAQ and a few PDFs → Ask “What is our refund policy?” → See a concise answer with a reference and a preview snippet → Click to open the source document if needed.
 
-- **Core**: Contains domain entities and business rules
-- **Application**: Contains use cases and application logic
-- **Infrastructure**: Contains external services (AWS Bedrock, file system)
-- **UI**: Contains the WPF user interface with MVVM pattern
+## Screenshots
 
-## Configuration Options
+Placeholders (replace with your own images in `docs/Screenshots`):
 
-### AWS Bedrock Models
+![Home Screen](docs/Screenshots/screenshot-1.png)
+![Ask a Question](docs/Screenshots/screenshot-2.png)
+![Search Results](docs/Screenshots/screenshot-3.png)
+![Document Preview](docs/Screenshots/screenshot-4.png)
 
-You can change the model by modifying the `ModelId` in `appsettings.json`:
+## Demo
 
-- `anthropic.claude-3-sonnet-20240229-v1:0` (Default - Recommended)
-- `anthropic.claude-3-haiku-20240307-v1:0` (Faster, less capable)
-- `amazon.titan-text-express-v1` (Alternative option)
+Watch a quick walkthrough:
 
-### AWS Regions
+- Local video: `docs/Videos/Ask Me Now Demo.mp4`
+- Placeholder path: `/docs/videos/demo.mp4`
+- Or add an online link: `https://your-demo-link.example.com`
 
-Supported regions include:
-- `us-east-1` (N. Virginia) - Default
-- `us-west-2` (Oregon)
-- `eu-west-1` (Ireland)
-- `ap-southeast-1` (Singapore)
+## Diagrams
 
-## Troubleshooting
+Diagrams are stored in `/docs/diagrams` (Mermaid `.mmd` files). Categories:
 
-### Common Issues
+- Class Diagram
+- Flow Diagram
+- Sequence Diagram
+- Architecture Diagram
 
-1. **"Access Denied" Error**:
-   - Verify your AWS credentials are correct
-   - Ensure you have Bedrock access enabled
-   - Check IAM permissions
+> You can view Mermaid diagrams directly in many editors or render them in docs.
 
-2. **"Model Not Available" Error**:
-   - Request access to the Claude model in AWS Bedrock console
-   - Wait for approval (can take a few minutes)
+## Roadmap / Future Enhancements
 
-3. **"No Documents Loaded" Error**:
-   - Ensure the selected folder contains `.txt` files
-   - Check file permissions
-   - Verify files are not empty
+- Add support for audio files (.mp3, .wav, etc.)
+- Add cloud storage integration (Google Drive, OneDrive, S3)
+- Enable multi‑user collaboration
+- Add advanced semantic search and embeddings
+- Build a web‑based version with the same functionality
 
-4. **Slow Response Times**:
-   - Large documents may take longer to process
-   - Consider breaking large files into smaller chunks
-   - Check your internet connection
+## Security & Best Practices
 
-### Performance Tips
+We care about safety, reliability, and maintainability:
 
-- Keep individual `.txt` files under 1MB for optimal performance
-- Use descriptive filenames to help with context
-- Organize related content in the same file
-- Avoid duplicate content across files
-
-## Development
-
-### Building from Source
-
-```bash
-# Restore packages
-dotnet restore
-
-# Build solution
-dotnet build
-
-# Run tests (if any)
-dotnet test
-
-# Run the application
-dotnet run --project AskMeNow.UI
-```
-
-### Adding New Features
-
-1. **New Domain Entities**: Add to `AskMeNow.Core/Entities/`
-2. **New Use Cases**: Add to `AskMeNow.Application/Services/`
-3. **New External Services**: Add to `AskMeNow.Infrastructure/Services/`
-4. **New UI Components**: Add to `AskMeNow.UI/Views/` and `ViewModels/`
-
-## License
-
-This project is licensed under the MIT License.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section above
-2. Review AWS Bedrock documentation
-3. Open an issue in the repository
+- Safe file handling: Prevents path traversal and restricts file access to allowed locations.
+- Input validation: Cleans and validates content before ingestion and processing.
+- Async operations: Uses asynchronous calls to keep the UI responsive and fast.
+- SOLID principles & Clean Architecture: Clear boundaries between UI, Core, Infrastructure, and Application.
+- Repository pattern: Predictable and testable data access.
+- Secrets management: Use environment variables or secure stores for API keys (never commit secrets).
 
 ---
 
-**Note**: This application requires an active internet connection to communicate with AWS Bedrock services. AWS charges apply for Bedrock API usage.
+Made with ❤️ to help you spend less time searching and more time doing. If you like it, a ⭐ on GitHub goes a long way!
+
+

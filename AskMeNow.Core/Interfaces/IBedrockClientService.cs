@@ -1,7 +1,8 @@
-namespace AskMeNow.Core.Interfaces;
-
-public interface IBedrockClientService
+namespace AskMeNow.Core.Interfaces
 {
-    Task<string> GenerateAnswerAsync(string question, string context);
-    Task<string> GenerateSuggestionsAsync(string prompt);
+    public interface IBedrockClientService
+    {
+        Task<string> GenerateAnswerAsync(string question, string context);
+        Task<string> GenerateSuggestionsAsync(string prompt);
+    }
 }

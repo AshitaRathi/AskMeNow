@@ -1,9 +1,11 @@
 using AskMeNow.Core.Entities;
 
-namespace AskMeNow.Core.Interfaces;
-
-public interface ISmallTalkService
+namespace AskMeNow.Core.Interfaces
 {
-    Task<string> GetResponseAsync(string userMessage, SentimentAnalysisResult analysis);
-    bool CanHandle(SentimentAnalysisResult analysis);
+    public interface ISmallTalkService
+    {
+        Task<string> GetResponseAsync(string userMessage, SentimentAnalysisResult analysis);
+        bool CanHandle(SentimentAnalysisResult analysis);
+    }
+
 }

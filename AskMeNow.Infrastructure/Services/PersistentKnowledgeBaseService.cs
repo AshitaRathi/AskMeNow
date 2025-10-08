@@ -5,307 +5,414 @@ using Microsoft.EntityFrameworkCore;
 using System.IO;
 using System.Text;
 
-namespace AskMeNow.Infrastructure.Services;
-
-public class PersistentKnowledgeBaseService : IPersistentKnowledgeBaseService, IDisposable
+namespace AskMeNow.Infrastructure.Services
 {
-    private readonly KnowledgeBaseContext _context;
-    private readonly IEmbeddingService _embeddingService;
-    private readonly IDocumentParserService _documentParserService;
-    private readonly FileSystemWatcher? _fileWatcher;
-    private readonly string _watchedFolderPath = string.Empty;
-    private bool _disposed = false;
-
-    public PersistentKnowledgeBaseService(
-        KnowledgeBaseContext context,
-        IEmbeddingService embeddingService,
-        IDocumentParserService documentParserService)
+    public class PersistentKnowledgeBaseService : IPersistentKnowledgeBaseService, IDisposable
     {
-        _context = context;
-        _embeddingService = embeddingService;
-        _documentParserService = documentParserService;
-    }
+        private readonly KnowledgeBaseContext _context;
+        private readonly IEmbeddingService _embeddingService;
+        private readonly IDocumentParserService _documentParserService;
+        private readonly ISemanticChunkingService _semanticChunkingService;
+        private readonly FileSystemWatcher? _fileWatcher;
+        private readonly string _watchedFolderPath = string.Empty;
+        private bool _disposed = false;
 
-    public async Task InitializeAsync()
-    {
-        await _context.Database.EnsureCreatedAsync();
-    }
-
-    public async Task ProcessDocumentAsync(string filePath)
-    {
-        if (!File.Exists(filePath))
-            return;
-
-        var fileInfo = new FileInfo(filePath);
-        var existingDocument = await _context.Documents
-            .FirstOrDefaultAsync(d => d.FilePath == filePath);
-
-        // Check if document needs processing
-        if (existingDocument != null && existingDocument.LastModified >= fileInfo.LastWriteTime)
+        public PersistentKnowledgeBaseService(
+            KnowledgeBaseContext context,
+            IEmbeddingService embeddingService,
+            IDocumentParserService documentParserService,
+            ISemanticChunkingService semanticChunkingService)
         {
-            return; // Document is up to date
+            _context = context;
+            _embeddingService = embeddingService;
+            _documentParserService = documentParserService;
+            _semanticChunkingService = semanticChunkingService;
         }
 
-        // Parse document content
-        string content;
-        try
+        public async Task InitializeAsync()
         {
-            var document = await _documentParserService.ParseDocumentAsync(filePath);
-            content = document?.Content ?? "No content extracted";
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Failed to parse document {filePath}: {ex.Message}");
-            content = "No content extracted - parsing failed";
+            await _context.Database.EnsureCreatedAsync();
         }
 
-        // Remove existing embeddings if document exists
-        if (existingDocument != null)
+        public async Task ProcessDocumentAsync(string filePath)
         {
-            _context.Embeddings.RemoveRange(existingDocument.Embeddings);
-            _context.Documents.Remove(existingDocument);
-        }
+            if (!File.Exists(filePath))
+                return;
 
-        // Create new document entity
-        var documentEntity = new DocumentEntity
-        {
-            FilePath = filePath,
-            FileName = Path.GetFileName(filePath),
-            LastModified = fileInfo.LastWriteTime,
-            Language = "en",
-            FileType = Path.GetExtension(filePath).ToLowerInvariant(),
-            FileSizeBytes = fileInfo.Length
-        };
+            var fileInfo = new FileInfo(filePath);
+            var existingDocument = await _context.Documents
+                .FirstOrDefaultAsync(d => d.FilePath == filePath);
 
-        _context.Documents.Add(documentEntity);
-        await _context.SaveChangesAsync();
-
-        // Split document into chunks and generate embeddings
-        var chunks = SplitIntoChunks(content, 500); // 500 character chunks
-        var embeddings = new List<EmbeddingEntity>();
-
-        for (int i = 0; i < chunks.Count; i++)
-        {
-            var chunk = chunks[i];
-            var embedding = await _embeddingService.GenerateEmbeddingAsync(chunk);
-
-            var embeddingEntity = new EmbeddingEntity
+            if (existingDocument != null && existingDocument.LastModified >= fileInfo.LastWriteTime)
             {
-                DocumentId = documentEntity.Id,
-                ChunkIndex = i,
-                TextChunk = chunk,
-                Vector = ConvertFloatArrayToBytes(embedding),
-                VectorDimensions = embedding.Length,
-                ModelVersion = _embeddingService.GetModelVersion()
-            };
+                return;
+            }
 
-            embeddings.Add(embeddingEntity);
-        }
 
-        _context.Embeddings.AddRange(embeddings);
-        await _context.SaveChangesAsync();
-    }
-
-    public async Task ProcessDocumentsInFolderAsync(string folderPath)
-    {
-        if (!Directory.Exists(folderPath))
-            return;
-
-        // Clear all existing documents and embeddings when processing a new folder
-        await ClearAllDocumentsAsync();
-
-        // Get all supported file types
-        var supportedExtensions = _documentParserService.GetSupportedExtensions();
-        var allFiles = Directory.GetFiles(folderPath, "*.*", SearchOption.AllDirectories);
-        var supportedFiles = allFiles
-            .Where(file => supportedExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
-            .ToList();
-        
-        foreach (var file in supportedFiles)
-        {
+            string content;
             try
             {
-                await ProcessDocumentAsync(file);
+                var document = await _documentParserService.ParseDocumentAsync(filePath);
+                content = document?.Content ?? "No content extracted";
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error processing {file}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Failed to parse document {filePath}: {ex.Message}");
+                content = "No content extracted - parsing failed";
             }
-        }
-    }
 
-    public async Task<List<DocumentSnippet>> FindRelevantSnippetsAsync(string question, int maxSnippets = 5)
-    {
-        if (string.IsNullOrWhiteSpace(question))
-            return new List<DocumentSnippet>();
-
-        // Generate embedding for the question
-        var questionEmbedding = await _embeddingService.GenerateEmbeddingAsync(question);
-
-        // Get all embeddings with their documents
-        var allEmbeddings = await _context.Embeddings
-            .Include(e => e.Document)
-            .ToListAsync();
-
-        var scoredSnippets = new List<(EmbeddingEntity embedding, float score)>();
-
-        // Calculate similarity scores
-        foreach (var embedding in allEmbeddings)
-        {
-            var storedVector = ConvertBytesToFloatArray(embedding.Vector, embedding.VectorDimensions);
-            var similarity = await _embeddingService.CalculateSimilarityAsync(questionEmbedding, storedVector);
-            
-            if (similarity > 0.1f) // Only include relevant snippets
+            if (existingDocument != null)
             {
-                scoredSnippets.Add((embedding, similarity));
+                _context.Embeddings.RemoveRange(existingDocument.Embeddings);
+                _context.Documents.Remove(existingDocument);
             }
-        }
 
-        // Sort by similarity and take top results
-        return scoredSnippets
-            .OrderByDescending(x => x.score)
-            .Take(maxSnippets)
-            .Select(x => new DocumentSnippet
+            var documentEntity = new DocumentEntity
             {
-                FileName = x.embedding.Document.FileName,
-                SnippetText = x.embedding.TextChunk,
-                RelevanceScore = x.score,
-                FilePath = x.embedding.Document.FilePath,
-                StartIndex = 0, // Could be calculated if needed
-                EndIndex = x.embedding.TextChunk.Length
-            })
-            .ToList();
-    }
+                FilePath = filePath,
+                FileName = Path.GetFileName(filePath),
+                LastModified = fileInfo.LastWriteTime,
+                Language = "en",
+                FileType = Path.GetExtension(filePath).ToLowerInvariant(),
+                FileSizeBytes = fileInfo.Length
+            };
 
-    public async Task DeleteDocumentAsync(string filePath)
-    {
-        var document = await _context.Documents
-            .FirstOrDefaultAsync(d => d.FilePath == filePath);
-
-        if (document != null)
-        {
-            _context.Documents.Remove(document);
+            _context.Documents.Add(documentEntity);
             await _context.SaveChangesAsync();
-        }
-    }
 
-    public async Task UpdateDocumentAsync(string filePath)
-    {
-        await ProcessDocumentAsync(filePath);
-    }
+            var semanticChunks = await _semanticChunkingService.ChunkDocumentAsync(content, documentEntity.FileName, documentEntity.FilePath);
+            var embeddings = new List<EmbeddingEntity>();
 
-    public async Task<List<DocumentEntity>> GetAllDocumentsAsync()
-    {
-        return await _context.Documents
-            .Include(d => d.Embeddings)
-            .ToListAsync();
-    }
-
-    public async Task<bool> IsDocumentProcessedAsync(string filePath)
-    {
-        return await _context.Documents
-            .AnyAsync(d => d.FilePath == filePath);
-    }
-
-    public async Task<DateTime?> GetDocumentLastProcessedAsync(string filePath)
-    {
-        var document = await _context.Documents
-            .FirstOrDefaultAsync(d => d.FilePath == filePath);
-
-        return document?.LastModified;
-    }
-
-    private List<string> SplitIntoChunks(string text, int chunkSize)
-    {
-        var chunks = new List<string>();
-        var sentences = SplitIntoSentences(text);
-
-        var currentChunk = new StringBuilder();
-        foreach (var sentence in sentences)
-        {
-            if (currentChunk.Length + sentence.Length > chunkSize && currentChunk.Length > 0)
+            for (int i = 0; i < semanticChunks.Count; i++)
             {
-                chunks.Add(currentChunk.ToString().Trim());
-                currentChunk.Clear();
-            }
-            currentChunk.Append(sentence).Append(" ");
-        }
+                var chunk = semanticChunks[i];
+                var embedding = await _embeddingService.GenerateEmbeddingAsync(chunk.Content);
 
-        if (currentChunk.Length > 0)
-        {
-            chunks.Add(currentChunk.ToString().Trim());
-        }
-
-        return chunks;
-    }
-
-    private List<string> SplitIntoSentences(string text)
-    {
-        var sentences = new List<string>();
-        var currentSentence = new StringBuilder();
-
-        for (int i = 0; i < text.Length; i++)
-        {
-            var currentChar = text[i];
-            currentSentence.Append(currentChar);
-
-            if (currentChar == '.' || currentChar == '!' || currentChar == '?')
-            {
-                if (i + 1 >= text.Length || char.IsWhiteSpace(text[i + 1]) || text[i + 1] == '\n')
+                var embeddingEntity = new EmbeddingEntity
                 {
-                    var sentence = currentSentence.ToString().Trim();
-                    if (!string.IsNullOrWhiteSpace(sentence))
-                    {
-                        sentences.Add(sentence);
-                    }
-                    currentSentence.Clear();
+                    DocumentId = documentEntity.Id,
+                    ChunkIndex = i,
+                    TextChunk = chunk.Content,
+                    Vector = ConvertFloatArrayToBytes(embedding),
+                    VectorDimensions = embedding.Length,
+                    ModelVersion = _embeddingService.GetModelVersion()
+                };
+
+                embeddings.Add(embeddingEntity);
+            }
+
+            _context.Embeddings.AddRange(embeddings);
+            await _context.SaveChangesAsync();
+
+            await ValidateDocumentEmbeddingsAsync(documentEntity.Id, documentEntity.FileName);
+        }
+
+        private async Task ValidateDocumentEmbeddingsAsync(int documentId, string fileName)
+        {
+            try
+            {
+                var testQuery = Path.GetFileNameWithoutExtension(fileName);
+                var testEmbedding = await _embeddingService.GenerateEmbeddingAsync(testQuery);
+
+                var documentEmbeddings = await _context.Embeddings
+                    .Where(e => e.DocumentId == documentId)
+                    .ToListAsync();
+
+                var maxSimilarity = 0f;
+                foreach (var embedding in documentEmbeddings)
+                {
+                    var storedVector = ConvertBytesToFloatArray(embedding.Vector, embedding.VectorDimensions);
+                    var similarity = await _embeddingService.CalculateSimilarityAsync(testEmbedding, storedVector);
+                    maxSimilarity = Math.Max(maxSimilarity, similarity);
+                }
+
+                if (maxSimilarity < 0.1f)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Warning: Low embedding similarity for document '{fileName}'. Max similarity: {maxSimilarity:F3}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"Embedding validation successful for '{fileName}'. Max similarity: {maxSimilarity:F3}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error validating embeddings for '{fileName}': {ex.Message}");
+            }
+        }
+
+        public async Task ProcessDocumentsInFolderAsync(string folderPath)
+        {
+            if (!Directory.Exists(folderPath))
+                return;
+
+            await ClearAllDocumentsAsync();
+
+            var supportedExtensions = _documentParserService.GetSupportedExtensions();
+            var allFiles = Directory.GetFiles(folderPath, "*.*", SearchOption.AllDirectories);
+            var supportedFiles = allFiles
+                .Where(file => supportedExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                .ToList();
+
+            foreach (var file in supportedFiles)
+            {
+                try
+                {
+                    await ProcessDocumentAsync(file);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error processing {file}: {ex.Message}");
                 }
             }
         }
 
-        var lastSentence = currentSentence.ToString().Trim();
-        if (!string.IsNullOrWhiteSpace(lastSentence))
+        public async Task<List<DocumentSnippet>> FindRelevantSnippetsAsync(string question, int maxSnippets = 5)
         {
-            sentences.Add(lastSentence);
+            if (string.IsNullOrWhiteSpace(question))
+                return new List<DocumentSnippet>();
+
+            var questionEmbedding = await _embeddingService.GenerateEmbeddingAsync(question);
+
+            var allEmbeddings = await _context.Embeddings
+                .Include(e => e.Document)
+                .ToListAsync();
+
+            var scoredSnippets = new List<(EmbeddingEntity embedding, float score)>();
+
+            foreach (var embedding in allEmbeddings)
+            {
+                var storedVector = ConvertBytesToFloatArray(embedding.Vector, embedding.VectorDimensions);
+                var similarity = await _embeddingService.CalculateSimilarityAsync(questionEmbedding, storedVector);
+
+                if (similarity > 0.1f)
+                {
+                    scoredSnippets.Add((embedding, similarity));
+                }
+            }
+
+            return scoredSnippets
+                .OrderByDescending(x => x.score)
+                .Take(maxSnippets)
+                .Select(x => new DocumentSnippet
+                {
+                    FileName = x.embedding.Document.FileName,
+                    SnippetText = x.embedding.TextChunk,
+                    RelevanceScore = x.score,
+                    FilePath = x.embedding.Document.FilePath,
+                    StartIndex = 0,
+                    EndIndex = x.embedding.TextChunk.Length
+                })
+                .ToList();
         }
 
-        return sentences;
-    }
-
-    private static byte[] ConvertFloatArrayToBytes(float[] array)
-    {
-        var bytes = new byte[array.Length * sizeof(float)];
-        Buffer.BlockCopy(array, 0, bytes, 0, bytes.Length);
-        return bytes;
-    }
-
-    private static float[] ConvertBytesToFloatArray(byte[] bytes, int dimensions)
-    {
-        var array = new float[dimensions];
-        Buffer.BlockCopy(bytes, 0, array, 0, bytes.Length);
-        return array;
-    }
-
-    private async Task ClearAllDocumentsAsync()
-    {
-        // Remove all embeddings first (due to foreign key constraints)
-        var allEmbeddings = await _context.Embeddings.ToListAsync();
-        _context.Embeddings.RemoveRange(allEmbeddings);
-        
-        // Remove all documents
-        var allDocuments = await _context.Documents.ToListAsync();
-        _context.Documents.RemoveRange(allDocuments);
-        
-        await _context.SaveChangesAsync();
-    }
-
-    public void Dispose()
-    {
-        if (!_disposed)
+        public async Task DeleteDocumentAsync(string filePath)
         {
-            _fileWatcher?.Dispose();
-            _context?.Dispose();
-            _disposed = true;
+            var document = await _context.Documents
+                .FirstOrDefaultAsync(d => d.FilePath == filePath);
+
+            if (document != null)
+            {
+                _context.Documents.Remove(document);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task UpdateDocumentAsync(string filePath)
+        {
+            await ProcessDocumentAsync(filePath);
+        }
+
+        public async Task<List<DocumentEntity>> GetAllDocumentsAsync()
+        {
+            return await _context.Documents
+                .Include(d => d.Embeddings)
+                .ToListAsync();
+        }
+
+        public async Task<bool> IsDocumentProcessedAsync(string filePath)
+        {
+            return await _context.Documents
+                .AnyAsync(d => d.FilePath == filePath);
+        }
+
+        public async Task<DateTime?> GetDocumentLastProcessedAsync(string filePath)
+        {
+            var document = await _context.Documents
+                .FirstOrDefaultAsync(d => d.FilePath == filePath);
+
+            return document?.LastModified;
+        }
+
+        private List<string> SplitIntoChunks(string text, int chunkSize)
+        {
+            var chunks = new List<string>();
+            var sentences = SplitIntoSentences(text);
+
+            var currentChunk = new StringBuilder();
+            foreach (var sentence in sentences)
+            {
+                if (currentChunk.Length + sentence.Length > chunkSize && currentChunk.Length > 0)
+                {
+                    chunks.Add(currentChunk.ToString().Trim());
+                    currentChunk.Clear();
+                }
+                currentChunk.Append(sentence).Append(" ");
+            }
+
+            if (currentChunk.Length > 0)
+            {
+                chunks.Add(currentChunk.ToString().Trim());
+            }
+
+            return chunks;
+        }
+
+        private List<string> SplitIntoSentences(string text)
+        {
+            var sentences = new List<string>();
+            var currentSentence = new StringBuilder();
+
+            for (int i = 0; i < text.Length; i++)
+            {
+                var currentChar = text[i];
+                currentSentence.Append(currentChar);
+
+                if (currentChar == '.' || currentChar == '!' || currentChar == '?')
+                {
+                    if (i + 1 >= text.Length || char.IsWhiteSpace(text[i + 1]) || text[i + 1] == '\n')
+                    {
+                        var sentence = currentSentence.ToString().Trim();
+                        if (!string.IsNullOrWhiteSpace(sentence))
+                        {
+                            sentences.Add(sentence);
+                        }
+                        currentSentence.Clear();
+                    }
+                }
+            }
+
+            var lastSentence = currentSentence.ToString().Trim();
+            if (!string.IsNullOrWhiteSpace(lastSentence))
+            {
+                sentences.Add(lastSentence);
+            }
+
+            return sentences;
+        }
+
+        private static byte[] ConvertFloatArrayToBytes(float[] array)
+        {
+            var bytes = new byte[array.Length * sizeof(float)];
+            Buffer.BlockCopy(array, 0, bytes, 0, bytes.Length);
+            return bytes;
+        }
+
+        private static float[] ConvertBytesToFloatArray(byte[] bytes, int dimensions)
+        {
+            var array = new float[dimensions];
+            Buffer.BlockCopy(bytes, 0, array, 0, bytes.Length);
+            return array;
+        }
+
+        private async Task ClearAllDocumentsAsync()
+        {
+            var allEmbeddings = await _context.Embeddings.ToListAsync();
+            _context.Embeddings.RemoveRange(allEmbeddings);
+
+            var allDocuments = await _context.Documents.ToListAsync();
+            _context.Documents.RemoveRange(allDocuments);
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<EmbeddingValidationResult> ValidateAllEmbeddingsAsync()
+        {
+            var result = new EmbeddingValidationResult();
+
+            try
+            {
+                result.TotalEmbeddings = await _context.Embeddings.CountAsync();
+
+                if (result.TotalEmbeddings == 0)
+                {
+                    result.IsValid = false;
+                    result.Errors.Add("No embeddings found in database");
+                    return result;
+                }
+
+                var testQueries = new List<string>
+            {
+                "introduction",
+                "summary",
+                "overview",
+                "main topic",
+                "key points",
+                "conclusion"
+            };
+
+                var allEmbeddings = await _context.Embeddings
+                    .Include(e => e.Document)
+                    .Take(200)
+                    .ToListAsync();
+
+                result.TestedEmbeddings = allEmbeddings.Count;
+                var totalSimilarity = 0f;
+                var validTests = 0;
+
+                foreach (var testQuery in testQueries)
+                {
+                    try
+                    {
+                        var queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(testQuery);
+                        var similarities = new List<float>();
+
+                        foreach (var embedding in allEmbeddings)
+                        {
+                            var storedVector = ConvertBytesToFloatArray(embedding.Vector, embedding.VectorDimensions);
+                            var similarity = await _embeddingService.CalculateSimilarityAsync(queryEmbedding, storedVector);
+                            similarities.Add(similarity);
+                        }
+
+                        var maxSimilarity = similarities.Max();
+                        var avgSimilarity = similarities.Average();
+
+                        result.TestResults.Add($"Query '{testQuery}': Max similarity = {maxSimilarity:F3}, Avg similarity = {avgSimilarity:F3}");
+
+                        totalSimilarity += maxSimilarity;
+                        validTests++;
+
+                        if (maxSimilarity < 0.1f)
+                        {
+                            result.Errors.Add($"No good matches found for test query: '{testQuery}' (max similarity: {maxSimilarity:F3})");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        result.Errors.Add($"Error testing query '{testQuery}': {ex.Message}");
+                    }
+                }
+
+                result.AverageSimilarity = validTests > 0 ? totalSimilarity / validTests : 0f;
+                result.IsValid = result.Errors.Count == 0 && result.AverageSimilarity > 0.1f;
+            }
+            catch (Exception ex)
+            {
+                result.IsValid = false;
+                result.Errors.Add($"Validation failed: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _fileWatcher?.Dispose();
+                _context?.Dispose();
+                _disposed = true;
+            }
         }
     }
 }

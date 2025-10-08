@@ -2,137 +2,128 @@ using AskMeNow.Core.Interfaces;
 using NAudio.Wave;
 using System.Speech.Recognition;
 
-namespace AskMeNow.Infrastructure.Services;
-
-public class SimpleSpeechToTextService : ISpeechToTextService, IDisposable
+namespace AskMeNow.Infrastructure.Services
 {
-    private SpeechRecognitionEngine? _speechRecognitionEngine;
-    private WaveInEvent? _waveIn;
-    private WaveFileWriter? _waveFileWriter;
-    private string? _tempAudioFilePath;
-    private bool _isRecording = false;
-    private readonly object _lockObject = new();
-    private TaskCompletionSource<string>? _recognitionTaskCompletionSource;
-
-    public bool IsInitialized => _speechRecognitionEngine != null;
-
-    public event EventHandler? RecordingStarted;
-    public event EventHandler? RecordingStopped;
-    public event EventHandler<float>? RecordingLevelChanged;
-
-    public async Task InitializeAsync()
+    public class SimpleSpeechToTextService : ISpeechToTextService, IDisposable
     {
-        if (IsInitialized) return;
+        private SpeechRecognitionEngine? _speechRecognitionEngine;
+        private WaveInEvent? _waveIn;
+        private WaveFileWriter? _waveFileWriter;
+        private string? _tempAudioFilePath;
+        private bool _isRecording = false;
+        private readonly object _lockObject = new();
+        private TaskCompletionSource<string>? _recognitionTaskCompletionSource;
 
-        try
-        {
-            // Initialize System.Speech.Recognition
-            _speechRecognitionEngine = new SpeechRecognitionEngine();
-            
-            // Create a simple grammar for general speech recognition
-            var grammar = new DictationGrammar();
-            _speechRecognitionEngine.LoadGrammar(grammar);
-            
-            // Set up event handlers
-            _speechRecognitionEngine.SpeechRecognized += OnSpeechRecognized;
-            _speechRecognitionEngine.SpeechRecognitionRejected += OnSpeechRecognitionRejected;
-            
-            // Set input to default audio device
-            _speechRecognitionEngine.SetInputToDefaultAudioDevice();
-            
-            // Add a small delay to ensure initialization is complete
-            await Task.Delay(100);
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException($"Failed to initialize speech recognition: {ex.Message}", ex);
-        }
-    }
+        public bool IsInitialized => _speechRecognitionEngine != null;
 
-    public async Task<string> RecordAndTranscribeAsync(int maxRecordingDurationSeconds = 15, CancellationToken cancellationToken = default)
-    {
-        if (!IsInitialized)
-        {
-            await InitializeAsync();
-        }
+        public event EventHandler? RecordingStarted;
+        public event EventHandler? RecordingStopped;
+        public event EventHandler<float>? RecordingLevelChanged;
 
-        lock (_lockObject)
+        public async Task InitializeAsync()
         {
-            if (_isRecording)
+            if (IsInitialized) return;
+
+            try
             {
-                throw new InvalidOperationException("Recording is already in progress");
+                _speechRecognitionEngine = new SpeechRecognitionEngine();
+
+                var grammar = new DictationGrammar();
+                _speechRecognitionEngine.LoadGrammar(grammar);
+
+                _speechRecognitionEngine.SpeechRecognized += OnSpeechRecognized;
+                _speechRecognitionEngine.SpeechRecognitionRejected += OnSpeechRecognitionRejected;
+
+                _speechRecognitionEngine.SetInputToDefaultAudioDevice();
+
+                await Task.Delay(100);
             }
-            _isRecording = true;
-        }
-
-        try
-        {
-            _recognitionTaskCompletionSource = new TaskCompletionSource<string>();
-            
-            // Start recognition
-            _speechRecognitionEngine!.RecognizeAsync(RecognizeMode.Single);
-            RecordingStarted?.Invoke(this, EventArgs.Empty);
-
-            // Set up cancellation
-            using (cancellationToken.Register(() => _recognitionTaskCompletionSource?.SetCanceled()))
+            catch (Exception ex)
             {
-                // Wait for recognition to complete or timeout
-                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(maxRecordingDurationSeconds), cancellationToken);
-                var recognitionTask = _recognitionTaskCompletionSource.Task;
-
-                var completedTask = await Task.WhenAny(recognitionTask, timeoutTask);
-                
-                if (completedTask == timeoutTask)
-                {
-                    _speechRecognitionEngine.RecognizeAsyncStop();
-                    return "Recording timeout - no speech detected";
-                }
-
-                if (recognitionTask.IsCanceled)
-                {
-                    return "Recording cancelled";
-                }
-
-                return await recognitionTask;
+                throw new InvalidOperationException($"Failed to initialize speech recognition: {ex.Message}", ex);
             }
         }
-        catch (Exception ex)
+
+        public async Task<string> RecordAndTranscribeAsync(int maxRecordingDurationSeconds = 15, CancellationToken cancellationToken = default)
         {
-            throw new InvalidOperationException($"Failed to record and transcribe: {ex.Message}", ex);
-        }
-        finally
-        {
+            if (!IsInitialized)
+            {
+                await InitializeAsync();
+            }
+
             lock (_lockObject)
             {
-                _isRecording = false;
+                if (_isRecording)
+                {
+                    throw new InvalidOperationException("Recording is already in progress");
+                }
+                _isRecording = true;
             }
-            RecordingStopped?.Invoke(this, EventArgs.Empty);
+
+            try
+            {
+                _recognitionTaskCompletionSource = new TaskCompletionSource<string>();
+
+                _speechRecognitionEngine!.RecognizeAsync(RecognizeMode.Single);
+                RecordingStarted?.Invoke(this, EventArgs.Empty);
+
+                using (cancellationToken.Register(() => _recognitionTaskCompletionSource?.SetCanceled()))
+                {
+                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(maxRecordingDurationSeconds), cancellationToken);
+                    var recognitionTask = _recognitionTaskCompletionSource.Task;
+
+                    var completedTask = await Task.WhenAny(recognitionTask, timeoutTask);
+
+                    if (completedTask == timeoutTask)
+                    {
+                        _speechRecognitionEngine.RecognizeAsyncStop();
+                        return "Recording timeout - no speech detected";
+                    }
+
+                    if (recognitionTask.IsCanceled)
+                    {
+                        return "Recording cancelled";
+                    }
+
+                    return await recognitionTask;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to record and transcribe: {ex.Message}", ex);
+            }
+            finally
+            {
+                lock (_lockObject)
+                {
+                    _isRecording = false;
+                }
+                RecordingStopped?.Invoke(this, EventArgs.Empty);
+            }
         }
-    }
 
-    public async Task<string> TranscribeAudioFileAsync(string audioFilePath, CancellationToken cancellationToken = default)
-    {
-        // For this simple implementation, we'll just return a placeholder
-        // In a real implementation, you would process the audio file
-        return await Task.FromResult("Audio file transcription not implemented in simple mode");
-    }
+        public async Task<string> TranscribeAudioFileAsync(string audioFilePath, CancellationToken cancellationToken = default)
+        {
+            return await Task.FromResult("Audio file transcription not implemented in simple mode");
+        }
 
-    private void OnSpeechRecognized(object? sender, SpeechRecognizedEventArgs e)
-    {
-        _recognitionTaskCompletionSource?.SetResult(e.Result.Text);
-        _speechRecognitionEngine?.RecognizeAsyncStop();
-    }
+        private void OnSpeechRecognized(object? sender, SpeechRecognizedEventArgs e)
+        {
+            _recognitionTaskCompletionSource?.SetResult(e.Result.Text);
+            _speechRecognitionEngine?.RecognizeAsyncStop();
+        }
 
-    private void OnSpeechRecognitionRejected(object? sender, SpeechRecognitionRejectedEventArgs e)
-    {
-        _recognitionTaskCompletionSource?.SetResult("No speech detected");
-        _speechRecognitionEngine?.RecognizeAsyncStop();
-    }
+        private void OnSpeechRecognitionRejected(object? sender, SpeechRecognitionRejectedEventArgs e)
+        {
+            _recognitionTaskCompletionSource?.SetResult("No speech detected");
+            _speechRecognitionEngine?.RecognizeAsyncStop();
+        }
 
-    public void Dispose()
-    {
-        _speechRecognitionEngine?.Dispose();
-        _waveIn?.Dispose();
-        _waveFileWriter?.Dispose();
+        public void Dispose()
+        {
+            _speechRecognitionEngine?.Dispose();
+            _waveIn?.Dispose();
+            _waveFileWriter?.Dispose();
+        }
     }
 }
