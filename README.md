@@ -132,22 +132,16 @@ dotnet run --project src/AskMeNow.UI
 
 ## Screenshots
 
-Placeholders (replace with your own images in `docs/Screenshots`):
-
-![Home Screen](docs/Screenshots/screenshot-1.png)
-![Ask a Question](docs/Screenshots/screenshot-2.png)
-![Search Results](docs/Screenshots/screenshot-3.png)
-![Document Preview](docs/Screenshots/screenshot-4.png)
+<img width="1918" height="1135" alt="Chat with AI Assistant   Loaded Documents" src="https://github.com/user-attachments/assets/8039d909-b3ab-43d0-9387-4d360df40cae" />
+<img width="1918" height="1135" alt="Document Preview Feature" src="https://github.com/user-attachments/assets/6d7ff736-5b96-47fa-9957-26cea8f3f13d" />
+<img width="1917" height="1131" alt="Show Resource of Answer Feature" src="https://github.com/user-attachments/assets/aed9998f-d0c4-45b0-8939-d8e3875e9634" />
+<img width="1913" height="1138" alt="Suggested Questions   Chat Export Feature" src="https://github.com/user-attachments/assets/37f25e27-a759-4f30-bbec-faf330fac54d" />
 
 ---
 
 ## Demo
 
-Watch a quick walkthrough:
-
-- Local video: `docs/Videos/Ask Me Now Demo.mp4`
-- Placeholder path: `/docs/videos/demo.mp4`
-- Or add an online link: `https://your-demo-link.example.com`
+Watch a quick walkthrough: `docs/Videos/Ask Me Now Demo.mp4`
 
 ---
 
